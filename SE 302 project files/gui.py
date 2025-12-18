@@ -75,7 +75,11 @@ class ExamSchedulerApp:
         lbl_title = tk.Label(header_frame, text="EXAMTABLE MANAGER", font=('Segoe UI', 24, 'bold'),
                              bg=self.colors["bg_white"], fg=self.colors["primary"])
         lbl_title.pack(pady=20)
-
+        
+        #help button
+        help_btn = ttk.Button(header_frame, text="? Help", command=self.show_help)
+        help_btn.place(relx=0.98, rely=0.5, anchor='e')
+    
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill='both', expand=True, padx=20, pady=20)
 
@@ -409,3 +413,10 @@ class ExamSchedulerApp:
                     writer.writerows(self.full_data)
                 messagebox.showinfo("Success", f"Data exported successfully!\nPlan: {self.view_var.get()}")
             except Exception as e: messagebox.showerror("Error", f"Export failed:\n{str(e)}")
+            
+    def show_help(self):
+        help_text = """
+    EXAMTABLE MANAGER - Help Menu
+    TBA
+    """
+        messagebox.showinfo("Help", help_text)
