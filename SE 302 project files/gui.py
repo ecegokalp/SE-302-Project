@@ -278,13 +278,25 @@ class ExamSchedulerApp:
         self.status_bar.config(text=msg)
         self.btn_start.config(state='normal')
         self.btn_stop.config(state='disabled')
+
         if success:
             messagebox.showinfo("Success", msg)
             self.notebook.select(self.tab_schedule)
             self.refresh_table()
+
         else:
-            if "Durdur" in msg or "Stopped" in msg: messagebox.showwarning("Cancelled", msg)
-            else: messagebox.showerror("Failed", msg)
+            if "timeout" in msg.lower():
+                messagebox.showwarning(
+                    "Timeout",
+                    "⏱️ Schedule generation stopped.\nTime limit (10 seconds) exceeded."
+                )
+
+            elif "stopped" in msg.lower() or "durdur" in msg.lower():
+                messagebox.showwarning("Cancelled", "⛔ Process stopped by user.")
+
+            else:
+                messagebox.showerror("Failed", msg)
+
 
     def build_schedule_tab(self):
         top_bar = tk.Frame(self.tab_schedule, bg=self.colors["bg_white"], pady=10)
