@@ -427,8 +427,121 @@ class ExamSchedulerApp:
             except Exception as e: messagebox.showerror("Error", f"Export failed:\n{str(e)}")
             
     def show_help(self):
-        help_text = """
-    EXAMTABLE MANAGER - Help Menu
-    TBA
-    """
-        messagebox.showinfo("Help", help_text)
+        help_window = tk.Toplevel(self.root)
+        help_window.title("Help - Examtable Manager")
+        help_window.geometry("700x600")
+        help_window.resizable(True, True)
+        
+        # Help content pages
+        help_pages = {
+            "index": {
+                "title": "Help Menu",
+                "content": "EXAMTABLE MANAGER - Help Topics\n\nClick on any topic below for detailed help:\n\n1. Uploading Data Files\n2. Setting Exam Calendar\n3. Generating Time Slots\n4. Creating Schedule\n5. Exporting Results",
+                "links": [
+                    ("Uploading Data Files", "upload"),
+                    ("Setting Exam Calendar", "calendar"),
+                    ("Generating Time Slots", "slots"),
+                    ("Creating Schedule", "schedule"),
+                    ("Exporting Results", "export")
+                ]
+            },
+            "upload": {
+                "title": "Uploading Data Files",
+                "content": "UPLOADING DATA FILES\n\n1. Click 'Select File...' next to Classroom List\n2. Choose your CSV or TXT file\n3. Repeat for Course List and Student List\n4. Green status indicates successful upload\n\nFile Format:\n- Classroom List: classroom_code, capacity\n- Course List: course_code, student_count\n- Student List: student_id, course_code",
+                "links": []
+            },
+            "calendar": {
+                "title": "Setting Exam Calendar",
+                "content": "SETTING EXAM CALENDAR\n\n1. Choose Start Date using the date picker\n2. Set Duration (number of days for exams)\n3. Click 'Generate Schedule' when ready\n\nTips:\n- Start Date: When your exams begin\n- Duration: Total number of days for all exams",
+                "links": []
+            },
+            "slots": {
+                "title": "Generating Time Slots",
+                "content": "GENERATING TIME SLOTS\n\n1. Set Start Time (e.g., 09:00)\n2. Set End Time (e.g., 17:00)\n3. Set Slot Duration in minutes (e.g., 60)\n4. Click '⚡ Generate Slots'\n\nExample:\n- Start: 09:00\n- End: 17:00\n- Duration: 60 min\n- Result: 09:00-10:00, 10:00-11:00, etc.",
+                "links": []
+            },
+            "schedule": {
+                "title": "Creating Schedule",
+                "content": "CREATING SCHEDULE\n\n1. Upload all required data files\n2. Configure calendar and time slots\n3. Click 'GENERATE SCHEDULE'\n\nThe system will automatically:\n- Assign courses to time slots\n- Allocate appropriate classrooms\n- Avoid scheduling conflicts\n- Respect classroom capacity\n\nView results in multiple formats after generation.",
+                "links": []
+            },
+            "export": {
+                "title": "Exporting Results",
+                "content": "EXPORTING RESULTS\n\n1. Go to 'SCHEDULE (RESULT)' tab\n2. Select desired view format:\n   - General Schedule: Overview of all exams\n   - Daily Plan: Organized by day\n   - Student Based: View by student\n   - Classroom Based: View by classroom\n3. Click 'Export CSV'\n4. Choose location to save",
+                "links": []
+            }
+        }
+        
+        # Current page tracking
+        current_page = {"page": "index"}
+        
+        # Title
+        title_label = tk.Label(help_window, text="Help Menu", font=('Segoe UI', 16, 'bold'),
+                            bg=self.colors["bg_white"], fg=self.colors["primary"])
+        title_label.pack(fill='x', padx=20, pady=15)
+        
+        # Content frame
+        content_frame = tk.Frame(help_window, bg=self.colors["bg_white"])
+        content_frame.pack(fill='both', expand=True, padx=20, pady=(0, 20))
+        
+        scrollbar = ttk.Scrollbar(content_frame)
+        scrollbar.pack(side='right', fill='y')
+        
+        help_text = tk.Text(content_frame, wrap='word', font=('Segoe UI', 10),
+                        bg=self.colors["bg_white"], fg=self.colors["text_body"],
+                        yscrollcommand=scrollbar.set, relief='flat', borderwidth=0, height=20)
+        scrollbar.config(command=help_text.yview)
+        help_text.pack(fill='both', expand=True)
+        
+        # Configure tags
+        help_text.tag_configure("link", foreground="blue", underline=True)
+        help_text.tag_bind("link", "<Enter>", lambda e: help_text.config(cursor="hand2"))
+        help_text.tag_bind("link", "<Leave>", lambda e: help_text.config(cursor="arrow"))
+        
+        # Navigation frame
+        nav_frame = tk.Frame(help_window, bg=self.colors["bg_white"])
+        nav_frame.pack(fill='x', padx=20, pady=10)
+        
+        btn_back = ttk.Button(nav_frame, text="← Back to Index")
+        btn_back.pack(side='left', padx=5)
+        
+        close_btn = ttk.Button(nav_frame, text="Close", command=help_window.destroy)
+        close_btn.pack(side='right', padx=5)
+        
+        # Load page function
+        def load_page(page_key):
+            help_text.config(state='normal')
+            help_text.delete('1.0', tk.END)
+            
+            page = help_pages.get(page_key, help_pages["index"])
+            current_page["page"] = page_key
+            
+            # Update title
+            title_label.config(text=page["title"])
+            
+            # Add content
+            help_text.insert('end', page["content"] + "\n\n")
+            
+            # Add links if any
+            if page["links"]:
+                help_text.insert('end', "\n--- Related Topics ---\n\n")
+                for link_text, link_page in page["links"]:
+                    # Create unique tag for each link
+                    unique_tag = f"link_{link_page}"
+                    help_text.tag_configure(unique_tag, foreground="blue", underline=True)
+                    help_text.tag_bind(unique_tag, "<Enter>", lambda e: help_text.config(cursor="hand2"))
+                    help_text.tag_bind(unique_tag, "<Leave>", lambda e: help_text.config(cursor="arrow"))
+                    help_text.tag_bind(unique_tag, "<Button-1>", lambda e, lp=link_page: load_page(lp))
+                    
+                    help_text.insert('end', f"• {link_text}\n", unique_tag)
+            
+            help_text.config(state='disabled')
+            
+            # Update navigation buttons
+            btn_back.config(state='normal' if page_key != "index" else 'disabled')
+        
+        # Set back button command
+        btn_back.config(command=lambda: load_page("index"))
+        
+        # Load initial page
+        load_page("index")
