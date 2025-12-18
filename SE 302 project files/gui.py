@@ -4,6 +4,10 @@ import threading
 import csv
 import re
 from datetime import datetime, timedelta
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.lib import colors
+
 
 try:
     from tkcalendar import DateEntry
@@ -313,6 +317,8 @@ class ExamSchedulerApp:
         cb.pack(side='left', padx=10)
         cb.bind("<<ComboboxSelected>>", self.refresh_table)
         ttk.Button(top_bar, text="Export CSV", command=self.export_to_csv).pack(side='right')
+        ttk.Button(top_bar, text="Export PDF", command=self.export_to_pdf).pack(side='right', padx=(10, 0))
+
 
         tree_frame = tk.Frame(self.tab_schedule, bg=self.colors["bg_white"])
         tree_frame.pack(fill='both', expand=True, padx=20, pady=(0, 20))
@@ -413,19 +419,88 @@ class ExamSchedulerApp:
         for row in self.full_data: self.tree.insert('', 'end', values=row)
 
     def export_to_csv(self):
-        if not self.full_data: return messagebox.showwarning("Warning", "No data to export.")
+        if not self.full_data:
+            return messagebox.showwarning("Warning", "No data to export.")
+
         view_name = self.view_var.get().replace(" ", "_")
         default_name = f"Schedule_{view_name}.csv"
-        path = filedialog.asksaveasfilename(defaultextension=".csv", initialfile=default_name, filetypes=[("CSV Files", "*.csv")])
-        if path:
-            try:
-                with open(path, 'w', newline='', encoding='utf-8-sig') as f:
-                    writer = csv.writer(f, delimiter=';')
-                    writer.writerow(self.tree['columns'])
+        path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            initialfile=default_name,
+            filetypes=[("CSV Files", "*.csv")]
+        )
+        if not path:
+            return
+
+        try:
+            with open(path, 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f, delimiter=',')
+                headers = list(self.tree['columns'])
+                writer.writerow(headers)
+
+                mode = self.view_var.get()
+
+                # Daily Plan: gün değişince boş satır + gün başlığı ekle
+                if mode == "Daily Plan":
+                    # full_data: (Day, Time, Course, Classroom, Students) :contentReference[oaicite:4]{index=4}
+                    rows = sorted(self.full_data, key=lambda r: (r[0], r[1]))
+                    last_day = None
+                    for row in rows:
+                        day = row[0]
+                        if day != last_day:
+                            # ayraç + gün başlığı
+                            if last_day is not None:
+                                writer.writerow([])  # boş satır
+                            writer.writerow([day, "", "", "", ""])  # gün başlığı
+                            last_day = day
+                        writer.writerow(list(row))
+                else:
                     writer.writerows(self.full_data)
-                messagebox.showinfo("Success", f"Data exported successfully!\nPlan: {self.view_var.get()}")
-            except Exception as e: messagebox.showerror("Error", f"Export failed:\n{str(e)}")
-            
+
+            messagebox.showinfo("Success", f"Data exported successfully!\nPlan: {self.view_var.get()}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Export failed:\n{str(e)}")
+
+    def export_to_pdf(self):
+        if not self.full_data:
+            return messagebox.showwarning("Warning", "No data to export.")
+
+        view_name = self.view_var.get().replace(" ", "_")
+        default_name = f"Schedule_{view_name}.pdf"
+
+        path = filedialog.asksaveasfilename(
+            defaultextension=".pdf",
+            initialfile=default_name,
+            filetypes=[("PDF Files", "*.pdf")]
+        )
+        if not path:
+            return
+
+        try:
+            doc = SimpleDocTemplate(
+                path,
+                pagesize=landscape(A4),
+                leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24
+            )
+
+            headers = list(self.tree['columns'])
+            table_data = [headers] + [list(r) for r in self.full_data]
+
+            tbl = Table(table_data, repeatRows=1)
+            tbl.setStyle(TableStyle([
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ]))
+
+            doc.build([tbl])
+            messagebox.showinfo("Success", f"PDF exported successfully!\nPlan: {self.view_var.get()}")
+        except Exception as e:
+            messagebox.showerror("Error", f"PDF export failed:\n{str(e)}")
+
     def show_help(self):
         help_window = tk.Toplevel(self.root)
         help_window.title("Help - Examtable Manager")
