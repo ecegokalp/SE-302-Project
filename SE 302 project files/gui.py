@@ -72,39 +72,6 @@ class ExamSchedulerApp:
         header_frame.pack(fill='x', side='top')
         tk.Frame(header_frame, bg=self.colors["accent_line"], height=2).pack(side='bottom', fill='x')
 
-        # Title and optional logo image
-        title_holder = tk.Frame(header_frame, bg=self.colors["bg_white"])
-        title_holder.pack(pady=14)
-
-        # Try to load a logo image from workspace (supports assets/logo.png or logo.png)
-        logo_path = None
-        for p in ("assets/logo.png", "logo.png"):
-            try:
-                with open(p, 'rb'):
-                    logo_path = p
-                    break
-            except Exception:
-                logo_path = None
-
-        logo_img = None
-        if logo_path:
-            try:
-                # Prefer Pillow if available for better PNG handling
-                from PIL import Image, ImageTk
-                img = Image.open(logo_path)
-                img = img.resize((64, 64), Image.LANCZOS)
-                logo_img = ImageTk.PhotoImage(img)
-            except Exception:
-                try:
-                    logo_img = tk.PhotoImage(file=logo_path)
-                except Exception:
-                    logo_img = None
-
-        if logo_img:
-            lbl_logo = tk.Label(title_holder, image=logo_img, bg=self.colors["bg_white"])
-            lbl_logo.image = logo_img
-            lbl_logo.pack(side='left', padx=(0,12))
-
         lbl_title = tk.Label(title_holder, text="EXAMTABLE MANAGER", font=('Segoe UI', 24, 'bold'),
                              bg=self.colors["bg_white"], fg=self.colors["primary"])
         lbl_title.pack(side='left')
