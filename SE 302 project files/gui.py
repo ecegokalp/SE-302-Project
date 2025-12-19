@@ -163,6 +163,7 @@ class ExamSchedulerApp:
 
         self.create_file_row(frame_files, "Classroom List:", self.imp_rooms)
         self.create_file_row(frame_files, "Course List:", self.imp_courses)
+        self.create_file_row(frame_files, "Attendance List:", self.imp_attendance)
         self.create_file_row(frame_files, "Student List:", self.imp_students)
 
         # DB Buttons (Merged from Code 2)
@@ -290,6 +291,7 @@ class ExamSchedulerApp:
 
     def imp_rooms(self): self.load_file(self.imp_rooms, self.system.load_classrooms_regex)
     def imp_courses(self): self.load_file(self.imp_courses, self.system.load_courses_regex)
+    def imp_attendance(self): self.load_file(self.imp_attendance, self.system.load_attendance_regex)
     def imp_students(self): self.load_file(self.imp_students, self.system.load_all_students_regex)
 
     def load_file(self, func_ref, system_method):
@@ -351,8 +353,9 @@ class ExamSchedulerApp:
             self.append_log(f"DB Load Error: {str(e)}")
 
     def start_process(self):
-        if not self.system.courses or not self.system.classrooms:
-            return messagebox.showerror("Missing Data", "Please upload required files.")
+        # Required for scheduling: classrooms and attendance (course->students)
+        if not self.system.classrooms or not self.system.courses:
+            return messagebox.showerror("Missing Data", "Please upload required files: Classroom List and Attendance List.")
         try:
             self.append_log("Schedule generation requested by user")
             if HAS_CALENDAR: self.start_date = self.ent_date.get_date()
@@ -367,6 +370,15 @@ class ExamSchedulerApp:
 
             self.slot_times = sorted(raw_slots, key=parse_slot)
 
+            # Calculate slot duration in minutes from first slot
+            try:
+                parts = self.slot_times[0].split('-')
+                start = datetime.strptime(parts[0].strip(), "%H:%M")
+                end = datetime.strptime(parts[1].strip(), "%H:%M")
+                slot_duration_minutes = int((end - start).total_seconds() / 60)
+            except:
+                slot_duration_minutes = 60  # default
+
             try:
                 days_val = int(self.ent_days.get())
             except:
@@ -374,6 +386,7 @@ class ExamSchedulerApp:
 
             self.system.num_days = days_val
             self.system.slots_per_day = len(self.slot_times)
+            self.system.slot_duration_minutes = slot_duration_minutes
 
             self.lbl_log.config(text="Calculating...")
             self.lbl_log.config(text="Process running...")
@@ -887,7 +900,7 @@ class ExamSchedulerApp:
             },
             "upload": {
                 "title": "Uploading Data Files",
-                "content": "UPLOADING DATA FILES\n\n1. Click 'Select File...' next to Classroom List\n2. Choose your CSV or TXT file\n3. Repeat for Course List and Student List\n4. Green status indicates successful upload\n\nFile Format:\n- Classroom List: classroom_code, capacity\n- Course List: course_code, student_count\n- Student List: student_id, course_code",
+                "content": "UPLOADING DATA FILES\n\nRequired for scheduling:\n- Classroom List (classroom codes and capacities)\n- Attendance List (per-course attendance lists)\n\nOptional:\n- Course List: a simple course list with optional durations (e.g. CourseCode_01 or CourseCode_01;90)\n  If durations are omitted, the GUI slot duration will be used as the exam duration.\n- Student List: plain list of student IDs (used for statistics / DB)\n\nHow to upload:\n1. Click 'Select File...' next to each data type\n2. Choose your CSV or TXT file\n3. Green status indicates successful upload\n\nFile Format Examples:\n- Classroom List: Classroom_01;40\n- Attendance List:\n  CourseCode_01\n  ['Std_ID_001', 'Std_ID_002']\n  CourseCode_02\n  ['Std_ID_003', 'Std_ID_004']\n- Course List: CourseCode_01 or CourseCode_01;90\n- Student List: Std_ID_001",
                 "links": []
             },
             "calendar": {

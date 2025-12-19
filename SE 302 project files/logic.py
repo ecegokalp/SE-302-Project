@@ -23,6 +23,7 @@ class ScheduleSystem:
 
         self.num_days = 7
         self.slots_per_day = 4
+        self.slot_duration_minutes = 60  # Default slot duration in minutes (can be set from GUI)
 
         self.assignments = {}
         self.student_room_map = {}
@@ -51,8 +52,35 @@ class ScheduleSystem:
 
     def load_courses_regex(self, filepath):
         try:
-            self.courses = data_access.read_courses_from_file(filepath)
-            return f"SUCCESS: {len(self.courses)} courses."
+            # Load optional courses file (may include durations). These Course objects
+            # will usually have empty student lists; attendance upload is the primary
+            # way to populate student lists.
+            loaded = data_access.read_courses_from_file(filepath)
+            # Merge or replace existing course entries' duration info
+            for c in loaded:
+                existing = next((x for x in self.courses if x.code == c.code), None)
+                if existing:
+                    if c.duration is not None:
+                        existing.duration = c.duration
+                else:
+                    # keep as course with no students (attendance may be loaded later)
+                    self.courses.append(c)
+            return f"SUCCESS: {len(loaded)} courses (durations optional)."
+        except Exception as e:
+            return f"ERROR: {e}"
+
+    def load_attendance_regex(self, filepath):
+        try:
+            # Attendance file is mandatory for scheduling: it provides per-course student lists
+            loaded = data_access.read_attendance_from_file(filepath)
+            # Merge durations from any previously loaded simple courses
+            for c in loaded:
+                existing = next((x for x in self.courses if x.code == c.code), None)
+                if existing and getattr(existing, 'duration', None) is not None:
+                    c.duration = existing.duration
+            # replace current courses with loaded attendance data
+            self.courses = loaded
+            return f"SUCCESS: {len(self.courses)} attendance entries loaded."
         except Exception as e:
             return f"ERROR: {e}"
 
@@ -73,14 +101,27 @@ class ScheduleSystem:
         """
         self.progress_callback = func
 
-    # ---------------- VALIDATION ----------------
-    def validate_feasibility(self):
-        total_slots = self.num_days * self.slots_per_day
-        total_capacity = sum(r.capacity for r in self.classrooms)
-        needed_seats = sum(len(c.students) for c in self.courses)
+    # --------------- MULTI-SLOT DURATION HELPERS ----------------
+    def get_slots_needed(self, course):
+        """
+        Calculate how many consecutive slots are needed for an exam.
+        If exam duration > slot duration, multiple slots are needed.
+        If exam duration < slot duration, it occupies 1 slot (with unused time).
+        """
+        import math
+        return max(1, math.ceil(course.duration / self.slot_duration_minutes))
 
-        if needed_seats > total_slots * total_capacity:
-            return False, "IMPOSSIBLE: capacity insufficient"
+    # ---- VALIDATION ----------------
+    def validate_feasibility(self):
+        # Account for multi-slot exams when computing total slot availability
+        total_time_slots = self.num_days * self.slots_per_day
+        total_capacity = sum(r.capacity for r in self.classrooms)
+        
+        # Sum of (students per exam * slots needed per exam)
+        total_slot_demand = sum(len(c.students) * self.get_slots_needed(c) for c in self.courses)
+        
+        if total_slot_demand > total_time_slots * total_capacity:
+            return False, "IMPOSSIBLE: capacity insufficient for exam durations"
         return True, "OK"
 
     def build_conflict_matrix(self):
@@ -91,23 +132,67 @@ class ScheduleSystem:
                     self.conflict_matrix[self.courses[i].code].add(self.courses[j].code)
                     self.conflict_matrix[self.courses[j].code].add(self.courses[i].code)
 
-    # ---------------- CONSTRAINTS ----------------
+    # ---- CONSTRAINTS ----------------
     def check_constraints(self, course, day, slot, student_agenda):
+        """
+        Check if a course can be assigned to a specific starting slot on a day.
+        The exam spans multiple slots if needed.
+        Respects:
+          - No back-to-back exams (adjacent slots)
+          - Max 2 exams per student per day
+          - No overlapping exams
+        """
+        slots_needed = self.get_slots_needed(course)
+        
+        # Verify all needed slots fit within the day
+        if slot + slots_needed > self.slots_per_day:
+            return False
+        
+        # New exam occupies slots [slot, slot + slots_needed)
+        new_exam_slots = set(range(slot, slot + slots_needed))
+        
+        # Check for student conflicts across all slots this exam will occupy
         for student in course.students:
-            exams_today = student_agenda[student][day]
-
-            if len(exams_today) >= 2:
+            exam_list = student_agenda[student][day]
+            
+            # exam_list now contains tuples: (start_slot, num_slots)
+            # Student can have at most 1 other exam on the same day
+            if len(exam_list) >= 2:
                 return False
-
-            for s in exams_today:
-                if s == slot or abs(s - slot) == 1:
+            
+            # Check no overlap or adjacency with existing exams
+            for existing_start, existing_slots in exam_list:
+                existing_slots_set = set(range(existing_start, existing_start + existing_slots))
+                
+                # Check overlap
+                if new_exam_slots & existing_slots_set:
                     return False
+                
+                # Check adjacency (no back-to-back): must have gap of at least 1 slot
+                existing_end = existing_start + existing_slots - 1
+                new_end = slot + slots_needed - 1
+                
+                # Back-to-back means the exams touch or are 1 slot apart
+                if abs(existing_start - new_end) <= 1 or abs(slot - existing_end) <= 1:
+                    return False
+        
         return True
 
-    # ---------------- ROOMS ----------------
+    # ---- ROOMS ----------------
     def find_rooms(self, course, day, slot):
-        used = self.room_schedule[(day, slot)]
-        available = [r for r in self.classrooms if r.code not in used]
+        """Find classrooms for the course. Rooms must be available for all slots the exam occupies."""
+        slots_needed = self.get_slots_needed(course)
+        
+        # Check which rooms are available for all slots this exam needs
+        available = []
+        for r in self.classrooms:
+            available_for_all = True
+            for s in range(slot, slot + slots_needed):
+                if r.code in self.room_schedule[(day, s)]:
+                    available_for_all = False
+                    break
+            if available_for_all:
+                available.append(r)
 
         available.sort(key=lambda r: (self.room_usage_count[r.code], -r.capacity))
 
@@ -119,7 +204,7 @@ class ScheduleSystem:
                 return selected
         return None
 
-    # ---------------- DISTRIBUTION ----------------
+    # ---- DISTRIBUTION ----------------
     def distribute_students(self):
         self.student_room_map.clear()
 
@@ -238,7 +323,8 @@ class ScheduleSystem:
             return True
 
         course = course_list[index]
-        slots = [(d, s) for d in range(self.num_days) for s in range(self.slots_per_day)]
+        slots_needed = self.get_slots_needed(course)
+        slots = [(d, s) for d in range(self.num_days) for s in range(self.slots_per_day - slots_needed + 1)]
         slots.sort(key=lambda x: self.slot_usage_count[x])
 
         for d, s in slots:
@@ -250,24 +336,28 @@ class ScheduleSystem:
                 continue
 
             self.assignments[course.code] = (d, s, rooms)
-            self.slot_usage_count[(d, s)] += 1
+            
+            # Mark all slots occupied by this multi-slot exam
+            for slot_offset in range(slots_needed):
+                self.slot_usage_count[(d, s + slot_offset)] += 1
 
             for r in rooms:
-                self.room_schedule[(d, s)].add(r.code)
-                self.room_usage_count[r.code] += 1
+                for slot_offset in range(slots_needed):
+                    self.room_schedule[(d, s + slot_offset)].add(r.code)
+                self.room_usage_count[r.code] += slots_needed
 
             for st in course.students:
-                student_agenda[st][d].append(s)
+                student_agenda[st][d].append((s, slots_needed))
 
             if self._backtrack(course_list, index + 1, student_agenda, start_time):
                 return True
 
             del self.assignments[course.code]
-            self.slot_usage_count[(d, s)] -= 1
+            for slot_offset in range(slots_needed):
+                self.slot_usage_count[(d, s + slot_offset)] -= 1
             for r in rooms:
-                self.room_schedule[(d, s)].remove(r.code)
-                self.room_usage_count[r.code] -= 1
+                for slot_offset in range(slots_needed):
+                    self.room_schedule[(d, s + slot_offset)].remove(r.code)
+                self.room_usage_count[r.code] -= slots_needed
             for st in course.students:
-                student_agenda[st][d].remove(s)
-
-        return False
+                student_agenda[st][d].remove((s, slots_needed))
