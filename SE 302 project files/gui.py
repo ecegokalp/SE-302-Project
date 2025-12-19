@@ -521,7 +521,7 @@ class ExamSchedulerApp:
         tk.Label(top_bar, text="View:", bg=self.colors["bg_white"], font=('Segoe UI', 10, 'bold')).pack(side='left')
         self.view_var = tk.StringVar(value="Daily Plan")
         cb = ttk.Combobox(top_bar, textvariable=self.view_var,
-                          values=["General Schedule", "Daily Plan", "Student Based", "Classroom Based"],
+                          values=["General Schedule", "Daily Plan", "Student Based", "Classroom Based", "Exam Attendance"],
                           state='readonly', width=20)
         cb.pack(side='left', padx=10)
         cb.bind("<<ComboboxSelected>>", self.refresh_table)
@@ -638,7 +638,7 @@ class ExamSchedulerApp:
     def refresh_table(self, event=None):
         mode = self.view_var.get()
         # Clean up any per-view widgets from previous view (search frames, day/student frames)
-        for attr in ('student_frame', 'student_search_frame', 'day_frame', 'day_search_frame'):
+        for attr in ('student_frame', 'student_search_frame', 'day_frame', 'day_search_frame', 'attendance_frame', 'attendance_search_frame'):
             if hasattr(self, attr) and getattr(self, attr):
                 try:
                     getattr(self, attr).destroy()
@@ -821,10 +821,105 @@ class ExamSchedulerApp:
                 for r in rooms:
                     self.full_data.append((r.code, self.get_real_datetime(d, s, c_code), c_code, "OCCUPIED"))
             self.full_data.sort()
+        elif mode == "Exam Attendance":
+            # Build attendance view: course -> list of students with their attendance status
+            # hide main tree
+            try:
+                self.tree.pack_forget()
+                self.tree_scrolly.pack_forget()
+                self.tree_scrollx.pack_forget()
+            except Exception:
+                pass
+
+            # Prepare course list for dropdown - add "All Students Overview" as first option
+            self.course_list_sorted = ["📋 All Students Overview"] + sorted([c.code for c in self.system.courses])
+
+            # create course picker search in center (per-view)
+            self.attendance_search_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
+            self.attendance_search_frame.pack(fill='x', padx=6, pady=(6,4))
+            tk.Label(self.attendance_search_frame, text="Select View:", bg=self.colors["bg_white"]).pack(side='left')
+            
+            self.course_var = tk.StringVar()
+            course_combo = ttk.Combobox(self.attendance_search_frame, textvariable=self.course_var,
+                                        values=self.course_list_sorted, state='readonly', width=30)
+            course_combo.pack(side='left', padx=(6,4))
+            
+            def _show_course_attendance(event=None):
+                selected = self.course_var.get()
+                if not selected:
+                    messagebox.showwarning("Select View", "Please choose an option.")
+                    return
+                if selected == "📋 All Students Overview":
+                    self._show_all_students_attendance()
+                else:
+                    self._show_exam_attendance(selected)
+            
+            course_combo.bind("<<ComboboxSelected>>", _show_course_attendance)
+            show_btn = ttk.Button(self.attendance_search_frame, text="Show", command=_show_course_attendance)
+            show_btn.pack(side='left', padx=(4,0))
+
+            # show All Students Overview by default
+            if self.course_list_sorted:
+                self.course_var.set(self.course_list_sorted[0])
+                self._show_all_students_attendance()
+            else:
+                # show message inside a dedicated attendance_frame so it can be destroyed cleanly
+                self.attendance_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
+                self.attendance_frame.pack(fill='both', expand=True)
+                lbl = tk.Label(self.attendance_frame, text="No data available.", bg=self.colors["bg_white"], fg=self.colors["text_body"])
+                lbl.pack(pady=20)
         for row in self.full_data: self.tree.insert('', 'end', values=row)
 
     def export_to_csv(self):
         view_name = self.view_var.get()
+
+        # If Exam Attendance view, export the attendance data
+        if view_name == "Exam Attendance":
+            all_students = self.system.all_students_list
+            if not all_students:
+                return messagebox.showwarning("Warning", "No 'All Students' data loaded.")
+            
+            default_name = "Exam_Attendance_AllStudents.csv"
+            path = filedialog.asksaveasfilename(defaultextension=".csv", initialfile=default_name, filetypes=[("CSV Files", "*.csv")])
+            if not path:
+                return
+            
+            try:
+                with open(path, 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.writer(f, delimiter=';')
+                    cols = ["Student ID", "Enrolled Courses", "Exam Count", "Status"]
+                    writer.writerow(cols)
+                    
+                    # Get all students who are enrolled in any course (from attendance)
+                    enrolled_students = set()
+                    for course in self.system.courses:
+                        for student in course.students:
+                            enrolled_students.add(student)
+                    
+                    students_sorted = sorted(all_students)
+                    for student_id in students_sorted:
+                        # Find courses this student is enrolled in
+                        student_courses = []
+                        for course in self.system.courses:
+                            if student_id in course.students:
+                                student_courses.append(course.code)
+                        
+                        exam_count = len(student_courses)
+                        if exam_count > 0:
+                            courses_str = ", ".join(sorted(student_courses))
+                            status = f"Enrolled ({exam_count} Exams)"
+                        else:
+                            courses_str = "No enrollment"
+                            status = "No Exam"
+                        
+                        writer.writerow([student_id, courses_str, exam_count, status])
+                
+                messagebox.showinfo("Success", f"Exam Attendance exported successfully!")
+                self.append_log(f"Exported CSV for Exam Attendance: {path}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Export failed:\n{str(e)}")
+                self.append_log(f"Export failed: {str(e)}")
+            return
 
         # If Daily Plan view, ask whether to export current day or all days
         if view_name == "Daily Plan":
@@ -959,7 +1054,7 @@ class ExamSchedulerApp:
 
     def export_to_pdf(self):
         # Merge of Block 2's PDF export logic
-        if not self.full_data and self.view_var.get() != "Daily Plan":
+        if not self.full_data and self.view_var.get() not in ["Daily Plan", "Exam Attendance"]:
             return messagebox.showwarning("Warning", "No data to export.")
 
         view_name = self.view_var.get().replace(" ", "_")
@@ -992,6 +1087,35 @@ class ExamSchedulerApp:
                         # row = (time_str, c_code, r_names, st_cnt)
                         data_rows.append([date_str] + list(row))
                 headers = cols
+                table_data = [headers] + data_rows
+            elif self.view_var.get() == "Exam Attendance":
+                # Special handling for Exam Attendance
+                all_students = self.system.all_students_list
+                if not all_students:
+                    return messagebox.showwarning("Warning", "No 'All Students' data loaded.")
+                
+                headers = ["Student ID", "Enrolled Courses", "Exam Count", "Status"]
+                data_rows = []
+                
+                students_sorted = sorted(all_students)
+                for student_id in students_sorted:
+                    student_courses = []
+                    for course in self.system.courses:
+                        if student_id in course.students:
+                            student_courses.append(course.code)
+                    
+                    exam_count = len(student_courses)
+                    if exam_count > 0:
+                        courses_str = ", ".join(sorted(student_courses)[:4])
+                        if len(student_courses) > 4:
+                            courses_str += f" (+{len(student_courses) - 4})"
+                        status = f"Enrolled"
+                    else:
+                        courses_str = "No enrollment"
+                        status = "No Exam"
+                    
+                    data_rows.append([student_id, courses_str, str(exam_count), status])
+                
                 table_data = [headers] + data_rows
             elif self.view_var.get() == "Student Based":
                 # Special handling for Student Based
@@ -1276,6 +1400,210 @@ class ExamSchedulerApp:
 
         # anchor at top-center; height is controlled by number of rows so there is no extra space below
         tbl.pack(anchor='n')
+        try:
+            tbl.yview_moveto(0)
+        except Exception:
+            pass
+
+    def _show_exam_attendance(self, course_code):
+        """Display exam attendance for a specific course - shows which students are enrolled and their room assignment."""
+        # remove previous attendance widgets if present
+        try:
+            if hasattr(self, 'attendance_frame') and self.attendance_frame:
+                self.attendance_frame.destroy()
+        except Exception:
+            pass
+
+        self.attendance_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
+        self.attendance_frame.pack(fill='both', expand=True, padx=6, pady=6)
+
+        # Find the course
+        course = next((c for c in self.system.courses if c.code == course_code), None)
+        if not course:
+            lbl = tk.Label(self.attendance_frame, text=f"Course '{course_code}' not found.", 
+                          bg=self.colors["bg_white"], fg=self.colors["text_body"])
+            lbl.pack(pady=20)
+            return
+
+        # Header with course info
+        hdr = tk.Frame(self.attendance_frame, bg="#cfd8dc")
+        hdr.pack(fill='x', padx=5, pady=(6,0))
+        
+        # Get exam info if scheduled
+        exam_info = ""
+        scheduled_room = ""
+        if course_code in self.system.assignments:
+            d, s, rooms = self.system.assignments[course_code]
+            exam_info = f" | Exam: {self.get_real_datetime(d, s, course_code)}"
+            scheduled_room = ", ".join([r.code for r in rooms])
+        
+        lbl = tk.Label(hdr, text=f"Course: {course_code} | Students: {len(course.students)}{exam_info}", 
+                      bg="#cfd8dc", fg=self.colors["text_header"], font=('Segoe UI', 12, 'bold'))
+        lbl.pack(side='left', padx=6, pady=6)
+        
+        if scheduled_room:
+            room_lbl = tk.Label(hdr, text=f"Room(s): {scheduled_room}", 
+                              bg="#cfd8dc", fg=self.colors["primary"], font=('Segoe UI', 10))
+            room_lbl.pack(side='right', padx=6, pady=6)
+
+        # Summary stats
+        stats_frame = tk.Frame(self.attendance_frame, bg=self.colors["bg_white"])
+        stats_frame.pack(fill='x', padx=10, pady=5)
+        
+        # Count students with room assignments
+        assigned_count = 0
+        for student in course.students:
+            if (student, course_code) in self.system.student_room_map:
+                assigned_count += 1
+        not_assigned_count = len(course.students) - assigned_count
+        
+        stats_text = f"✓ Assigned: {assigned_count}  |  ✗ Not Assigned: {not_assigned_count}"
+        stats_lbl = tk.Label(stats_frame, text=stats_text, bg=self.colors["bg_white"], 
+                            fg=self.colors["text_body"], font=('Segoe UI', 10))
+        stats_lbl.pack(side='left')
+
+        # Student list table with scrollbar
+        tbl_container = tk.Frame(self.attendance_frame, bg=self.colors["bg_white"])
+        tbl_container.pack(fill='both', expand=True, padx=10, pady=8)
+
+        cols = ["Student ID", "Room Assignment", "Status"]
+        
+        scrollbar = ttk.Scrollbar(tbl_container, orient="vertical")
+        tbl = ttk.Treeview(tbl_container, columns=cols, show='headings', 
+                          yscrollcommand=scrollbar.set, height=20)
+        scrollbar.config(command=tbl.yview)
+        
+        for c in cols:
+            tbl.heading(c, text=c)
+        tbl.column("Student ID", width=250, anchor='center')
+        tbl.column("Room Assignment", width=250, anchor='center')
+        tbl.column("Status", width=180, anchor='center')
+
+        # Populate table with students
+        students_sorted = sorted(course.students)
+        for student_id in students_sorted:
+            room = self.system.student_room_map.get((student_id, course_code), None)
+            if room:
+                status = "✓ Assigned"
+                status_tag = "assigned"
+            else:
+                room = "Not Assigned"
+                status = "✗ Not Assigned"
+                status_tag = "not_assigned"
+            tbl.insert('', 'end', values=(student_id, room, status), tags=(status_tag,))
+        
+        # Configure row colors
+        tbl.tag_configure("assigned", background="#e8f5e9")  # light green
+        tbl.tag_configure("not_assigned", background="#ffebee")  # light red
+
+        scrollbar.pack(side='right', fill='y')
+        tbl.pack(side='left', fill='both', expand=True)
+        
+        try:
+            tbl.yview_moveto(0)
+        except Exception:
+            pass
+
+    def _show_all_students_attendance(self):
+        """Display all students from 'All Students' file and show which ones are enrolled in exams."""
+        # remove previous attendance widgets if present
+        try:
+            if hasattr(self, 'attendance_frame') and self.attendance_frame:
+                self.attendance_frame.destroy()
+        except Exception:
+            pass
+
+        self.attendance_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
+        self.attendance_frame.pack(fill='both', expand=True, padx=6, pady=6)
+
+        # Check if All Students data is loaded
+        all_students = self.system.all_students_list
+        if not all_students:
+            lbl = tk.Label(self.attendance_frame, 
+                          text="⚠️ 'All Students' file not loaded!\n\nPlease upload 'All Students' file in the Settings tab.", 
+                          bg=self.colors["bg_white"], fg=self.colors["danger"], font=('Segoe UI', 12))
+            lbl.pack(pady=40)
+            return
+
+        # Get all students who are enrolled in any course (from attendance)
+        enrolled_students = set()
+        for course in self.system.courses:
+            for student in course.students:
+                enrolled_students.add(student)
+
+        # Calculate stats
+        enrolled_count = len(enrolled_students)
+        not_enrolled_count = len(all_students) - len(enrolled_students & all_students)
+        students_in_all = all_students
+        
+        # Header
+        hdr = tk.Frame(self.attendance_frame, bg="#cfd8dc")
+        hdr.pack(fill='x', padx=5, pady=(6,0))
+        
+        lbl = tk.Label(hdr, text=f"📋 All Students Overview | Total: {len(all_students)} students", 
+                      bg="#cfd8dc", fg=self.colors["text_header"], font=('Segoe UI', 12, 'bold'))
+        lbl.pack(side='left', padx=6, pady=6)
+
+        # Summary stats
+        stats_frame = tk.Frame(self.attendance_frame, bg=self.colors["bg_white"])
+        stats_frame.pack(fill='x', padx=10, pady=5)
+        
+        enrolled_in_all = enrolled_students & all_students
+        not_enrolled_in_all = all_students - enrolled_students
+        
+        stats_text = f"✓ Enrolled in Exams: {len(enrolled_in_all)}  |  ✗ No Exam Enrollment: {len(not_enrolled_in_all)}"
+        stats_lbl = tk.Label(stats_frame, text=stats_text, bg=self.colors["bg_white"], 
+                            fg=self.colors["text_body"], font=('Segoe UI', 10))
+        stats_lbl.pack(side='left')
+
+        # Student list table with scrollbar
+        tbl_container = tk.Frame(self.attendance_frame, bg=self.colors["bg_white"])
+        tbl_container.pack(fill='both', expand=True, padx=10, pady=8)
+
+        cols = ["Student ID", "Enrolled Courses", "Exam Count", "Status"]
+        
+        scrollbar = ttk.Scrollbar(tbl_container, orient="vertical")
+        tbl = ttk.Treeview(tbl_container, columns=cols, show='headings', 
+                          yscrollcommand=scrollbar.set, height=20)
+        scrollbar.config(command=tbl.yview)
+        
+        for c in cols:
+            tbl.heading(c, text=c)
+        tbl.column("Student ID", width=180, anchor='center')
+        tbl.column("Enrolled Courses", width=350, anchor='w')
+        tbl.column("Exam Count", width=100, anchor='center')
+        tbl.column("Status", width=150, anchor='center')
+
+        # Populate table with all students
+        students_sorted = sorted(all_students)
+        for student_id in students_sorted:
+            # Find courses this student is enrolled in
+            student_courses = []
+            for course in self.system.courses:
+                if student_id in course.students:
+                    student_courses.append(course.code)
+            
+            exam_count = len(student_courses)
+            if exam_count > 0:
+                courses_str = ", ".join(sorted(student_courses)[:3])
+                if len(student_courses) > 3:
+                    courses_str += f" (+{len(student_courses) - 3} more)"
+                status = f"✓ {exam_count} Exam(s)"
+                status_tag = "enrolled"
+            else:
+                courses_str = "No enrollment"
+                status = "✗ No Exam"
+                status_tag = "not_enrolled"
+            
+            tbl.insert('', 'end', values=(student_id, courses_str, exam_count, status), tags=(status_tag,))
+        
+        # Configure row colors
+        tbl.tag_configure("enrolled", background="#e8f5e9")  # light green
+        tbl.tag_configure("not_enrolled", background="#ffebee")  # light red
+
+        scrollbar.pack(side='right', fill='y')
+        tbl.pack(side='left', fill='both', expand=True)
+        
         try:
             tbl.yview_moveto(0)
         except Exception:
