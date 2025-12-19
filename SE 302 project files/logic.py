@@ -105,11 +105,17 @@ class ScheduleSystem:
     def get_slots_needed(self, course):
         """
         Calculate how many consecutive slots are needed for an exam.
-        If exam duration > slot duration, multiple slots are needed.
-        If exam duration < slot duration, it occupies 1 slot (with unused time).
+        - If course has explicit duration from file: use that duration
+        - If no explicit duration: each exam = 1 slot (user's configured slot duration)
         """
         import math
-        return max(1, math.ceil(course.duration / self.slot_duration_minutes))
+        # Check if duration was explicitly set in course file
+        if hasattr(course, '_explicit_duration') and course._explicit_duration:
+            # Use course's explicitly set duration
+            return max(1, math.ceil(course.duration / self.slot_duration_minutes))
+        else:
+            # No explicit duration - each exam fits in exactly 1 slot
+            return 1
 
     # ---- VALIDATION ----------------
     def validate_feasibility(self):

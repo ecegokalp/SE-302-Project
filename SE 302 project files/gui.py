@@ -531,27 +531,32 @@ class ExamSchedulerApp:
         date = self.start_date + timedelta(days=d)
         days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         
-        # If course_code is provided, calculate the actual exam duration
+        # If course_code is provided and has explicit duration, calculate actual exam duration
         if course_code:
             course = next((c for c in self.system.courses if c.code == course_code), None)
             if course and s < len(self.slot_times):
-                # Get start time from first slot
-                start_time_str = self.slot_times[s].split('-')[0].strip()
-                # Calculate actual end time based on exam duration
-                try:
-                    start_time = datetime.strptime(start_time_str, "%H:%M")
-                    end_time = start_time + timedelta(minutes=course.duration)
-                    end_time_str = end_time.strftime("%H:%M")
-                    time = f"{start_time_str}-{end_time_str}"
-                except:
-                    # Fallback to slot-based calculation
-                    slots_needed = self.system.get_slots_needed(course)
-                    end_slot_index = s + slots_needed - 1
-                    if end_slot_index < len(self.slot_times):
-                        end_time_str = self.slot_times[end_slot_index].split('-')[1].strip()
+                # Check if course has explicit duration from file
+                if hasattr(course, '_explicit_duration') and course._explicit_duration:
+                    # Get start time from slot
+                    start_time_str = self.slot_times[s].split('-')[0].strip()
+                    try:
+                        start_time = datetime.strptime(start_time_str, "%H:%M")
+                        end_time = start_time + timedelta(minutes=course.duration)
+                        end_time_str = end_time.strftime("%H:%M")
                         time = f"{start_time_str}-{end_time_str}"
-                    else:
-                        time = self.slot_times[s]
+                    except:
+                        # Fallback to slot-based calculation
+                        slots_needed = self.system.get_slots_needed(course)
+                        end_slot_index = s + slots_needed - 1
+                        if end_slot_index < len(self.slot_times):
+                            end_time_str = self.slot_times[end_slot_index].split('-')[1].strip()
+                            start_time_str = self.slot_times[s].split('-')[0].strip()
+                            time = f"{start_time_str}-{end_time_str}"
+                        else:
+                            time = self.slot_times[s]
+                else:
+                    # No explicit duration - use slot time directly
+                    time = self.slot_times[s]
             else:
                 time = self.slot_times[s] if s < len(self.slot_times) else "??"
         else:
@@ -641,26 +646,33 @@ class ExamSchedulerApp:
             day_groups = defaultdict(list)
             for c_code, (d, s, rooms) in self.system.assignments.items():
                 date = (self.start_date + timedelta(days=d)).strftime('%Y-%m-%d')
-                # Calculate actual time span for this exam based on its duration
                 c = next((x for x in self.system.courses if x.code == c_code), None)
+                
+                # Check if course has explicit duration from file
                 if c and s < len(self.slot_times):
-                    start_time_str = self.slot_times[s].split('-')[0].strip()
-                    try:
-                        start_time = datetime.strptime(start_time_str, "%H:%M")
-                        end_time = start_time + timedelta(minutes=c.duration)
-                        end_time_str = end_time.strftime("%H:%M")
-                        time_str = f"{start_time_str}-{end_time_str}"
-                    except:
-                        # Fallback to slot-based calculation
-                        slots_needed = self.system.get_slots_needed(c)
-                        end_slot = s + slots_needed - 1
-                        if end_slot < len(self.slot_times):
-                            end_time_str = self.slot_times[end_slot].split('-')[1].strip()
+                    if hasattr(c, '_explicit_duration') and c._explicit_duration:
+                        # Use course's explicit duration
+                        start_time_str = self.slot_times[s].split('-')[0].strip()
+                        try:
+                            start_time = datetime.strptime(start_time_str, "%H:%M")
+                            end_time = start_time + timedelta(minutes=c.duration)
+                            end_time_str = end_time.strftime("%H:%M")
                             time_str = f"{start_time_str}-{end_time_str}"
-                        else:
-                            time_str = self.slot_times[s]
+                        except:
+                            # Fallback to slot-based calculation
+                            slots_needed = self.system.get_slots_needed(c)
+                            end_slot = s + slots_needed - 1
+                            if end_slot < len(self.slot_times):
+                                end_time_str = self.slot_times[end_slot].split('-')[1].strip()
+                                time_str = f"{start_time_str}-{end_time_str}"
+                            else:
+                                time_str = self.slot_times[s]
+                    else:
+                        # No explicit duration - use slot time directly
+                        time_str = self.slot_times[s]
                 else:
                     time_str = self.slot_times[s] if s < len(self.slot_times) else '??'
+                
                 st_cnt = len(c.students) if c else 0
                 r_names = ", ".join([r.code for r in rooms])
                 day_groups[date].append((time_str, c_code, r_names, st_cnt))
