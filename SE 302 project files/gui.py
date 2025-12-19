@@ -127,6 +127,11 @@ class ExamSchedulerApp:
         self.create_file_row(frame_files, "Course List:", self.imp_courses)
         self.create_file_row(frame_files, "Student List:", self.imp_students)
 
+        ttk.Separator(frame_files, orient="horizontal").pack(fill="x", pady=10)
+
+        ttk.Button(frame_files, text="💾 Save to Database", command=self.save_to_db).pack(anchor="w", pady=3)
+        ttk.Button(frame_files, text="📥 Load from Database", command=self.load_from_db).pack(anchor="w", pady=3)
+
         frame_time = tk.LabelFrame(container, text="2. Exam Calendar Settings", **lf_style)
         frame_time.pack(side='top', fill='both', expand=True, pady=(0, 10))
 
@@ -500,6 +505,39 @@ class ExamSchedulerApp:
             messagebox.showinfo("Success", f"PDF exported successfully!\nPlan: {self.view_var.get()}")
         except Exception as e:
             messagebox.showerror("Error", f"PDF export failed:\n{str(e)}")
+
+    def save_to_db(self):
+        try:
+            self.system.save_data_to_db()
+            messagebox.showinfo("Database", "Saved classrooms/courses/students to DB ✅")
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+
+    def load_from_db(self):
+        try:
+            self.system.load_data_from_db()
+
+            c_count = len(self.system.classrooms)
+            crs_count = len(self.system.courses)
+            st_count = len(self.system.all_students_list)
+
+            if c_count == 0 or crs_count == 0:
+                messagebox.showwarning(
+                    "Database",
+                    "Database loaded but no usable data found!"
+                )
+                return
+
+            messagebox.showinfo(
+                "Database",
+                f"Loaded from DB ✅\n"
+                f"Classrooms: {c_count}\n"
+                f"Courses: {crs_count}\n"
+                f"Students: {st_count}"
+            )
+
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
 
     def show_help(self):
         help_window = tk.Toplevel(self.root)
