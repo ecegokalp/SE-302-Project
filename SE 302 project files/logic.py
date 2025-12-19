@@ -60,8 +60,10 @@ class ScheduleSystem:
             for c in loaded:
                 existing = next((x for x in self.courses if x.code == c.code), None)
                 if existing:
-                    if c.duration is not None:
+                    # If loaded course has explicit duration, update existing
+                    if hasattr(c, '_explicit_duration') and c._explicit_duration:
                         existing.duration = c.duration
+                        existing._explicit_duration = True
                 else:
                     # keep as course with no students (attendance may be loaded later)
                     self.courses.append(c)
@@ -76,8 +78,9 @@ class ScheduleSystem:
             # Merge durations from any previously loaded simple courses
             for c in loaded:
                 existing = next((x for x in self.courses if x.code == c.code), None)
-                if existing and getattr(existing, 'duration', None) is not None:
+                if existing and hasattr(existing, '_explicit_duration') and existing._explicit_duration:
                     c.duration = existing.duration
+                    c._explicit_duration = True
             # replace current courses with loaded attendance data
             self.courses = loaded
             return f"SUCCESS: {len(self.courses)} attendance entries loaded."
