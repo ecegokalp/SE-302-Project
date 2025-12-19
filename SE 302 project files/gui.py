@@ -170,8 +170,28 @@ class ExamSchedulerApp:
         sep.pack(fill="x", pady=10)
         db_frame = tk.Frame(frame_files, bg=self.colors["bg_white"])
         db_frame.pack(fill='x', pady=2)
-        ttk.Button(db_frame, text="💾 Save to Database", command=self.save_to_db).pack(side='left', padx=5)
-        ttk.Button(db_frame, text="📥 Load from Database", command=self.load_from_db).pack(side='left', padx=5)
+        # --- DB Buttons (2 save + 2 load + 2 compare) ---
+        sep = ttk.Separator(frame_files, orient="horizontal")
+        sep.pack(fill="x", pady=10)
+
+        db_frame = tk.Frame(frame_files, bg=self.colors["bg_white"])
+        db_frame.pack(fill='x', pady=2)
+
+        row1 = tk.Frame(db_frame, bg=self.colors["bg_white"])
+        row1.pack(fill='x', pady=(0, 6))
+
+        row2 = tk.Frame(db_frame, bg=self.colors["bg_white"])
+        row2.pack(fill='x')
+
+        ttk.Button(row1, text="💾 Save 1", command=lambda: self.save_to_db_slot(1)).pack(side='left', padx=5)
+        ttk.Button(row1, text="📥 Load 1", command=lambda: self.load_from_db_slot(1)).pack(side='left', padx=5)
+        ttk.Button(row1, text="💾 Save 2", command=lambda: self.save_to_db_slot(2)).pack(side='left', padx=5)
+        ttk.Button(row1, text="📥 Load 2", command=lambda: self.load_from_db_slot(2)).pack(side='left', padx=5)
+
+        ttk.Button(row2, text="🔎 Compare with Save 1", command=lambda: self.compare_with_save(1)).pack(side='left',
+                                                                                                       padx=5)
+        ttk.Button(row2, text="🔎 Compare with Save 2", command=lambda: self.compare_with_save(2)).pack(side='left',
+                                                                                                       padx=5)
 
         # --- 2. Calendar Section ---
         frame_time = tk.LabelFrame(left_col, text="2. Exam Calendar Settings", **lf_style)
@@ -310,6 +330,55 @@ class ExamSchedulerApp:
             except:
                 fname = path
             self.append_log(f"Import {fname}: {msg}")
+
+    def save_to_db_slot(self, slot: int):
+        try:
+            self.system.save_data_to_db(slot)
+            messagebox.showinfo("Database", f"Saved to DB ✅ (Save {slot})")
+            self.append_log(f"Data saved to Database (slot={slot}).")
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+            self.append_log(f"DB Save Error (slot={slot}): {str(e)}")
+
+    def load_from_db_slot(self, slot: int):
+        try:
+            self.system.load_data_from_db(slot)
+
+            c_count = len(self.system.classrooms)
+            crs_count = len(self.system.courses)
+            st_count = len(self.system.all_students_list)
+
+            if c_count == 0 or crs_count == 0:
+                messagebox.showwarning("Database", f"Save {slot} loaded but no usable data found!")
+                self.append_log(f"DB Load (slot={slot}): No data found.")
+                return
+
+            messagebox.showinfo(
+                "Database",
+                f"Loaded from DB ✅ (Load {slot})\n"
+                f"Classrooms: {c_count}\n"
+                f"Courses: {crs_count}\n"
+                f"Students: {st_count}"
+            )
+            self.append_log(f"DB Loaded (slot={slot}): {c_count} rooms, {crs_count} courses, {st_count} students.")
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+            self.append_log(f"DB Load Error (slot={slot}): {str(e)}")
+
+    def compare_with_save(self, slot: int):
+        try:
+            summary, msg = self.system.compare_with_slot_summary(slot)
+            messagebox.showinfo("Compare Result", msg)
+            self.append_log(
+                f"Compare vs Save {slot}: "
+                f"rooms(miss={summary['classrooms_missing_in_db']}, extra={summary['classrooms_extra_in_db']}, capdiff={summary['classrooms_capacity_changed']}), "
+                f"students(miss={summary['students_missing_in_db']}, extra={summary['students_extra_in_db']}), "
+                f"courses(miss={summary['courses_missing_in_db']}, extra={summary['courses_extra_in_db']}), "
+                f"course_student_diffs={summary['courses_with_student_diff']}"
+            )
+        except Exception as e:
+            messagebox.showerror("Compare Error", str(e))
+            self.append_log(f"Compare Error (slot={slot}): {str(e)}")
 
     # --- DB Methods from Code 2 ---
     def save_to_db(self):

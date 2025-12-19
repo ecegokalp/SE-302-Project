@@ -193,31 +193,218 @@ class ScheduleSystem:
         except Exception as e:
             return False, f"CRASH PREVENTED: {e}"
 
-    def save_data_to_db(self):
+    def save_data_to_db(self, slot: int = 1):
         # classrooms
         cls = [(r.code, r.capacity) for r in self.classrooms]
-        self.db.save_classrooms(cls)
+        self.db.save_classrooms(slot, cls)
 
         # courses + course_students
         crs = [(c.code, c.students) for c in self.courses]
-        self.db.save_courses_and_students(crs)
+        self.db.save_courses_and_students(slot, crs)
 
         # students (AYRI TABLO)
         if self.all_students_list:
-            self.db.save_students(self.all_students_list)
+            self.db.save_students(slot, self.all_students_list)
 
-    def load_data_from_db(self):
+    def load_data_from_db(self, slot: int = 1):
         # classrooms
-        cls = self.db.load_classrooms()
+        cls = self.db.load_classrooms(slot)
         self.classrooms = [Classroom(code, cap) for code, cap in cls]
 
         # students
-        students = self.db.load_students()
+        students = self.db.load_students(slot)
         self.all_students_list = set(students)
 
         # courses + students
-        crs = self.db.load_courses_with_students()
+        crs = self.db.load_courses_with_students(slot)
         self.courses = [Course(code, studs) for code, studs in crs]
+
+    def _fmt_list(self, items, limit=12):
+        items = sorted(list(items))
+        if not items:
+            return "-"
+        if len(items) <= limit:
+            return ", ".join(items)
+        return ", ".join(items[:limit]) + f" ... (+{len(items) - limit} more)"
+
+    def compare_with_slot_detailed(self, slot: int = 1):
+        snap = self.db.get_slot_snapshot(slot)
+
+        # CURRENT (memory)
+        cur_classrooms = {r.code: r.capacity for r in self.classrooms}
+        cur_students = set(self.all_students_list) if self.all_students_list else set()
+        cur_courses = {c.code: set(c.students) for c in self.courses}
+
+        # DB
+        db_cls = snap["classrooms"]  # dict code->cap
+        db_students = snap["students"]  # set
+        db_courses = snap["courses"]  # dict course->set(student)
+
+        # ---- Classrooms diff ----
+        cls_missing_in_db = set(cur_classrooms) - set(db_cls)
+        cls_extra_in_db = set(db_cls) - set(cur_classrooms)
+
+        cap_changed = []
+        for code in (set(cur_classrooms) & set(db_cls)):
+            if cur_classrooms[code] != db_cls[code]:
+                cap_changed.append((code, db_cls[code], cur_classrooms[code]))
+
+        # ---- Students diff ----
+        st_missing_in_db = cur_students - db_students
+        st_extra_in_db = db_students - cur_students
+
+        # ---- Courses diff ----
+        crs_missing_in_db = set(cur_courses) - set(db_courses)
+        crs_extra_in_db = set(db_courses) - set(cur_courses)
+
+        # Per-course student diffs
+        per_course = []
+        for code in sorted(set(cur_courses) & set(db_courses)):
+            cur_set = cur_courses[code]
+            db_set = db_courses[code]
+            cur_not_db = cur_set - db_set
+            db_not_cur = db_set - cur_set
+            if cur_not_db or db_not_cur:
+                per_course.append((code, cur_not_db, db_not_cur))
+
+        # ---- Output ----
+        lines = []
+        lines.append(f"Detailed Compare vs Save {slot}")
+        lines.append("")
+
+        lines.append("== Classrooms ==")
+        lines.append(f"DB: {len(db_cls)} | Current: {len(cur_classrooms)}")
+        lines.append(f"Missing in DB (exists in current): {self._fmt_list(cls_missing_in_db)}")
+        lines.append(f"Extra in DB (not in current): {self._fmt_list(cls_extra_in_db)}")
+        if cap_changed:
+            lines.append("Capacity changed (code: DB -> Current):")
+            for code, db_cap, cur_cap in cap_changed[:10]:
+                lines.append(f"  - {code}: {db_cap} -> {cur_cap}")
+            if len(cap_changed) > 10:
+                lines.append(f"  ... (+{len(cap_changed) - 10} more)")
+        else:
+            lines.append("Capacity changed: -")
+        lines.append("")
+
+        lines.append("== Students ==")
+        lines.append(f"DB: {len(db_students)} | Current: {len(cur_students)}")
+        lines.append(f"Missing in DB (exists in current): {self._fmt_list(st_missing_in_db)}")
+        lines.append(f"Extra in DB (not in current): {self._fmt_list(st_extra_in_db)}")
+        lines.append("")
+
+        lines.append("== Courses ==")
+        lines.append(f"DB: {len(db_courses)} | Current: {len(cur_courses)}")
+        lines.append(f"Missing in DB (exists in current): {self._fmt_list(crs_missing_in_db)}")
+        lines.append(f"Extra in DB (not in current): {self._fmt_list(crs_extra_in_db)}")
+        lines.append("")
+
+        lines.append("== Course -> Students (diff) ==")
+        if not per_course:
+            lines.append("No per-course student differences ✅")
+        else:
+            for code, cur_not_db, db_not_cur in per_course[:10]:
+                lines.append(f"- {code}")
+                lines.append(f"  Current-but-not-DB: {self._fmt_list(cur_not_db)}")
+                lines.append(f"  DB-but-not-Current: {self._fmt_list(db_not_cur)}")
+            if len(per_course) > 10:
+                lines.append(f"... (+{len(per_course) - 10} more courses with differences)")
+
+        return "\n".join(lines)
+
+    def compare_with_slot_summary(self, slot: int = 1):
+        """
+        Returns numeric diff summary between CURRENT (memory) and DB save slot.
+        """
+        snap = self.db.get_slot_snapshot(slot)
+
+        # CURRENT (memory)
+        cur_classrooms = {r.code: r.capacity for r in self.classrooms}
+        cur_students = set(self.all_students_list) if self.all_students_list else set()
+        cur_courses = {c.code: set(c.students) for c in self.courses}
+
+        # DB snapshot
+        db_cls = snap["classrooms"]  # dict code->cap
+        db_students = snap["students"]  # set
+        db_courses = snap["courses"]  # dict course->set(student_ids)
+
+        # Classrooms
+        cls_missing_in_db = set(cur_classrooms) - set(db_cls)
+        cls_extra_in_db = set(db_cls) - set(cur_classrooms)
+        cap_changed = [
+            code for code in (set(cur_classrooms) & set(db_cls))
+            if cur_classrooms[code] != db_cls[code]
+        ]
+
+        # Students
+        st_missing_in_db = cur_students - db_students
+        st_extra_in_db = db_students - cur_students
+
+        # Courses
+        crs_missing_in_db = set(cur_courses) - set(db_courses)
+        crs_extra_in_db = set(db_courses) - set(cur_courses)
+
+        # Per-course student diffs (counts)
+        per_course_diff_count = 0
+        total_cur_not_db = 0
+        total_db_not_cur = 0
+        for code in (set(cur_courses) & set(db_courses)):
+            cur_set = cur_courses[code]
+            db_set = db_courses[code]
+            a = cur_set - db_set
+            b = db_set - cur_set
+            if a or b:
+                per_course_diff_count += 1
+                total_cur_not_db += len(a)
+                total_db_not_cur += len(b)
+
+        summary = {
+            "slot": slot,
+
+            "classrooms_current": len(cur_classrooms),
+            "classrooms_db": len(db_cls),
+            "classrooms_missing_in_db": len(cls_missing_in_db),
+            "classrooms_extra_in_db": len(cls_extra_in_db),
+            "classrooms_capacity_changed": len(cap_changed),
+
+            "students_current": len(cur_students),
+            "students_db": len(db_students),
+            "students_missing_in_db": len(st_missing_in_db),
+            "students_extra_in_db": len(st_extra_in_db),
+
+            "courses_current": len(cur_courses),
+            "courses_db": len(db_courses),
+            "courses_missing_in_db": len(crs_missing_in_db),
+            "courses_extra_in_db": len(crs_extra_in_db),
+
+            "courses_with_student_diff": per_course_diff_count,
+            "total_students_current_not_db_in_common_courses": total_cur_not_db,
+            "total_students_db_not_current_in_common_courses": total_db_not_cur,
+        }
+
+        # GUI'de direkt göstermek için kısa bir metin de üretelim
+        msg_lines = [
+            f"Compare (Numeric) vs Save {slot}",
+            "",
+            f"Classrooms  | DB={summary['classrooms_db']}  Current={summary['classrooms_current']}",
+            f"  Missing in DB: {summary['classrooms_missing_in_db']}",
+            f"  Extra in DB  : {summary['classrooms_extra_in_db']}",
+            f"  Capacity diff: {summary['classrooms_capacity_changed']}",
+            "",
+            f"Students    | DB={summary['students_db']}  Current={summary['students_current']}",
+            f"  Missing in DB: {summary['students_missing_in_db']}",
+            f"  Extra in DB  : {summary['students_extra_in_db']}",
+            "",
+            f"Courses     | DB={summary['courses_db']}  Current={summary['courses_current']}",
+            f"  Missing in DB: {summary['courses_missing_in_db']}",
+            f"  Extra in DB  : {summary['courses_extra_in_db']}",
+            "",
+            f"Course->Student diffs:",
+            f"  Courses with diff: {summary['courses_with_student_diff']}",
+            f"  Current-not-DB (total): {summary['total_students_current_not_db_in_common_courses']}",
+            f"  DB-not-Current (total): {summary['total_students_db_not_current_in_common_courses']}",
+        ]
+
+        return summary, "\n".join(msg_lines)
 
     def _backtrack(self, course_list, index, student_agenda, start_time):
         if self.stop_event.is_set():
