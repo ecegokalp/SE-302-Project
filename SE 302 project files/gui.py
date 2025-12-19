@@ -162,6 +162,7 @@ class ExamSchedulerApp:
         frame_files.pack(side='top', fill='x', pady=(0, 20), anchor='n')
 
         self.create_file_row(frame_files, "Classroom List:", self.imp_rooms)
+        self.create_file_row(frame_files, "Attendance List:", self.imp_attendance)
         self.create_file_row(frame_files, "Course List:", self.imp_courses)
         self.create_file_row(frame_files, "Student List:", self.imp_students)
 
@@ -170,28 +171,8 @@ class ExamSchedulerApp:
         sep.pack(fill="x", pady=10)
         db_frame = tk.Frame(frame_files, bg=self.colors["bg_white"])
         db_frame.pack(fill='x', pady=2)
-        # --- DB Buttons (2 save + 2 load + 2 compare) ---
-        sep = ttk.Separator(frame_files, orient="horizontal")
-        sep.pack(fill="x", pady=10)
-
-        db_frame = tk.Frame(frame_files, bg=self.colors["bg_white"])
-        db_frame.pack(fill='x', pady=2)
-
-        row1 = tk.Frame(db_frame, bg=self.colors["bg_white"])
-        row1.pack(fill='x', pady=(0, 6))
-
-        row2 = tk.Frame(db_frame, bg=self.colors["bg_white"])
-        row2.pack(fill='x')
-
-        ttk.Button(row1, text="💾 Save 1", command=lambda: self.save_to_db_slot(1)).pack(side='left', padx=5)
-        ttk.Button(row1, text="📥 Load 1", command=lambda: self.load_from_db_slot(1)).pack(side='left', padx=5)
-        ttk.Button(row1, text="💾 Save 2", command=lambda: self.save_to_db_slot(2)).pack(side='left', padx=5)
-        ttk.Button(row1, text="📥 Load 2", command=lambda: self.load_from_db_slot(2)).pack(side='left', padx=5)
-
-        ttk.Button(row2, text="🔎 Compare with Save 1", command=lambda: self.compare_with_save(1)).pack(side='left',
-                                                                                                       padx=5)
-        ttk.Button(row2, text="🔎 Compare with Save 2", command=lambda: self.compare_with_save(2)).pack(side='left',
-                                                                                                       padx=5)
+        ttk.Button(db_frame, text="💾 Save to Database", command=self.save_to_db).pack(side='left', padx=5)
+        ttk.Button(db_frame, text="📥 Load from Database", command=self.load_from_db).pack(side='left', padx=5)
 
         # --- 2. Calendar Section ---
         frame_time = tk.LabelFrame(left_col, text="2. Exam Calendar Settings", **lf_style)
@@ -310,6 +291,7 @@ class ExamSchedulerApp:
 
     def imp_rooms(self): self.load_file(self.imp_rooms, self.system.load_classrooms_regex)
     def imp_courses(self): self.load_file(self.imp_courses, self.system.load_courses_regex)
+    def imp_attendance(self): self.load_file(self.imp_attendance, self.system.load_attendance_regex)
     def imp_students(self): self.load_file(self.imp_students, self.system.load_all_students_regex)
 
     def load_file(self, func_ref, system_method):
@@ -330,55 +312,6 @@ class ExamSchedulerApp:
             except:
                 fname = path
             self.append_log(f"Import {fname}: {msg}")
-
-    def save_to_db_slot(self, slot: int):
-        try:
-            self.system.save_data_to_db(slot)
-            messagebox.showinfo("Database", f"Saved to DB ✅ (Save {slot})")
-            self.append_log(f"Data saved to Database (slot={slot}).")
-        except Exception as e:
-            messagebox.showerror("Database Error", str(e))
-            self.append_log(f"DB Save Error (slot={slot}): {str(e)}")
-
-    def load_from_db_slot(self, slot: int):
-        try:
-            self.system.load_data_from_db(slot)
-
-            c_count = len(self.system.classrooms)
-            crs_count = len(self.system.courses)
-            st_count = len(self.system.all_students_list)
-
-            if c_count == 0 or crs_count == 0:
-                messagebox.showwarning("Database", f"Save {slot} loaded but no usable data found!")
-                self.append_log(f"DB Load (slot={slot}): No data found.")
-                return
-
-            messagebox.showinfo(
-                "Database",
-                f"Loaded from DB ✅ (Load {slot})\n"
-                f"Classrooms: {c_count}\n"
-                f"Courses: {crs_count}\n"
-                f"Students: {st_count}"
-            )
-            self.append_log(f"DB Loaded (slot={slot}): {c_count} rooms, {crs_count} courses, {st_count} students.")
-        except Exception as e:
-            messagebox.showerror("Database Error", str(e))
-            self.append_log(f"DB Load Error (slot={slot}): {str(e)}")
-
-    def compare_with_save(self, slot: int):
-        try:
-            summary, msg = self.system.compare_with_slot_summary(slot)
-            messagebox.showinfo("Compare Result", msg)
-            self.append_log(
-                f"Compare vs Save {slot}: "
-                f"rooms(miss={summary['classrooms_missing_in_db']}, extra={summary['classrooms_extra_in_db']}, capdiff={summary['classrooms_capacity_changed']}), "
-                f"students(miss={summary['students_missing_in_db']}, extra={summary['students_extra_in_db']}), "
-                f"courses(miss={summary['courses_missing_in_db']}, extra={summary['courses_extra_in_db']}), "
-                f"course_student_diffs={summary['courses_with_student_diff']}"
-            )
-        except Exception as e:
-            messagebox.showerror("Compare Error", str(e))
-            self.append_log(f"Compare Error (slot={slot}): {str(e)}")
 
     # --- DB Methods from Code 2 ---
     def save_to_db(self):
@@ -420,8 +353,9 @@ class ExamSchedulerApp:
             self.append_log(f"DB Load Error: {str(e)}")
 
     def start_process(self):
-        if not self.system.courses or not self.system.classrooms:
-            return messagebox.showerror("Missing Data", "Please upload required files.")
+        # Required for scheduling: classrooms and attendance (course->students)
+        if not self.system.classrooms or not self.system.courses:
+            return messagebox.showerror("Missing Data", "Please upload required files: Classroom List and Attendance List.")
         try:
             self.append_log("Schedule generation requested by user")
             if HAS_CALENDAR: self.start_date = self.ent_date.get_date()
@@ -436,6 +370,15 @@ class ExamSchedulerApp:
 
             self.slot_times = sorted(raw_slots, key=parse_slot)
 
+            # Calculate slot duration in minutes from first slot
+            try:
+                parts = self.slot_times[0].split('-')
+                start = datetime.strptime(parts[0].strip(), "%H:%M")
+                end = datetime.strptime(parts[1].strip(), "%H:%M")
+                slot_duration_minutes = int((end - start).total_seconds() / 60)
+            except:
+                slot_duration_minutes = 60  # default
+
             try:
                 days_val = int(self.ent_days.get())
             except:
@@ -443,6 +386,7 @@ class ExamSchedulerApp:
 
             self.system.num_days = days_val
             self.system.slots_per_day = len(self.slot_times)
+            self.system.slot_duration_minutes = slot_duration_minutes
 
             self.lbl_log.config(text="Calculating...")
             self.lbl_log.config(text="Process running...")
@@ -528,10 +472,36 @@ class ExamSchedulerApp:
         self.tree_scrollx = scrollx
         self.set_columns_daily()
 
-    def get_real_datetime(self, d, s):
+    def get_real_datetime(self, d, s, course_code=None):
         date = self.start_date + timedelta(days=d)
-        time = self.slot_times[s] if s < len(self.slot_times) else "??"
         days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        
+        # If course_code is provided, calculate the actual exam duration
+        if course_code:
+            course = next((c for c in self.system.courses if c.code == course_code), None)
+            if course and s < len(self.slot_times):
+                # Get start time from first slot
+                start_time_str = self.slot_times[s].split('-')[0].strip()
+                # Calculate actual end time based on exam duration
+                try:
+                    start_time = datetime.strptime(start_time_str, "%H:%M")
+                    end_time = start_time + timedelta(minutes=course.duration)
+                    end_time_str = end_time.strftime("%H:%M")
+                    time = f"{start_time_str}-{end_time_str}"
+                except:
+                    # Fallback to slot-based calculation
+                    slots_needed = self.system.get_slots_needed(course)
+                    end_slot_index = s + slots_needed - 1
+                    if end_slot_index < len(self.slot_times):
+                        end_time_str = self.slot_times[end_slot_index].split('-')[1].strip()
+                        time = f"{start_time_str}-{end_time_str}"
+                    else:
+                        time = self.slot_times[s]
+            else:
+                time = self.slot_times[s] if s < len(self.slot_times) else "??"
+        else:
+            time = self.slot_times[s] if s < len(self.slot_times) else "??"
+        
         return f"{date.strftime('%Y-%m-%d')} ({days[date.weekday()]}) {time}"
 
     def get_day_and_date(self, d):
@@ -608,7 +578,7 @@ class ExamSchedulerApp:
                 st_cnt = len(c.students) if c else 0
                 r_names = ", ".join([r.code for r in rooms])
                 cap = f"{st_cnt} / {sum(r.capacity for r in rooms)}"
-                self.full_data.append((c_code, self.get_real_datetime(d,s), st_cnt, r_names, cap))
+                self.full_data.append((c_code, self.get_real_datetime(d, s, c_code), st_cnt, r_names, cap))
         elif mode == "Daily Plan":
             # Build per-day selectable view: date picker + table for chosen day
             # collect assignments per date string
@@ -616,8 +586,26 @@ class ExamSchedulerApp:
             day_groups = defaultdict(list)
             for c_code, (d, s, rooms) in self.system.assignments.items():
                 date = (self.start_date + timedelta(days=d)).strftime('%Y-%m-%d')
-                time_str = self.slot_times[s] if s < len(self.slot_times) else '??'
+                # Calculate actual time span for this exam based on its duration
                 c = next((x for x in self.system.courses if x.code == c_code), None)
+                if c and s < len(self.slot_times):
+                    start_time_str = self.slot_times[s].split('-')[0].strip()
+                    try:
+                        start_time = datetime.strptime(start_time_str, "%H:%M")
+                        end_time = start_time + timedelta(minutes=c.duration)
+                        end_time_str = end_time.strftime("%H:%M")
+                        time_str = f"{start_time_str}-{end_time_str}"
+                    except:
+                        # Fallback to slot-based calculation
+                        slots_needed = self.system.get_slots_needed(c)
+                        end_slot = s + slots_needed - 1
+                        if end_slot < len(self.slot_times):
+                            end_time_str = self.slot_times[end_slot].split('-')[1].strip()
+                            time_str = f"{start_time_str}-{end_time_str}"
+                        else:
+                            time_str = self.slot_times[s]
+                else:
+                    time_str = self.slot_times[s] if s < len(self.slot_times) else '??'
                 st_cnt = len(c.students) if c else 0
                 r_names = ", ".join([r.code for r in rooms])
                 day_groups[date].append((time_str, c_code, r_names, st_cnt))
@@ -682,7 +670,7 @@ class ExamSchedulerApp:
             for (sid, c_code), r_code in self.system.student_room_map.items():
                 if c_code in self.system.assignments:
                     d, s, _ = self.system.assignments[c_code]
-                    temp_data.append((sid, c_code, self.get_real_datetime(d, s), r_code))
+                    temp_data.append((sid, c_code, self.get_real_datetime(d, s, c_code), r_code))
             temp_data.sort(key=lambda x: (x[0], x[2]))
             self.full_data = temp_data
 
@@ -736,7 +724,7 @@ class ExamSchedulerApp:
             self.set_columns_classroom()
             for c_code, (d, s, rooms) in self.system.assignments.items():
                 for r in rooms:
-                    self.full_data.append((r.code, self.get_real_datetime(d,s), c_code, "OCCUPIED"))
+                    self.full_data.append((r.code, self.get_real_datetime(d, s, c_code), c_code, "OCCUPIED"))
             self.full_data.sort()
         for row in self.full_data: self.tree.insert('', 'end', values=row)
 
@@ -938,81 +926,48 @@ class ExamSchedulerApp:
     def show_help(self):
         help_window = tk.Toplevel(self.root)
         help_window.title("Help - Examtable Manager")
-        help_window.geometry("500x500")
+        help_window.geometry("700x600")
         help_window.resizable(True, True)
 
         # Help content pages
         help_pages = {
-            
-    "index": {
-        "title": "Help Menu",
-        "content":
-            "EXAMTABLE MANAGER – HELP MENU\n\n"
-            "Select a topic below to learn how to use the system.\n\n"
-            "1. How to Use\n"
-            "2. Input File Information\n"
-            "3. Rules and Constraints\n"
-            "4. About",
-        "links": [
-            ("How to Use", "howto"),
-            ("Input File Info", "input"),
-            ("Rules and Constraints", "rules"),
-            ("About", "about")
-        ]
-    },
-
-    "howto": {
-        "title": "How to Use",
-        "content":
-            "HOW TO USE THE SYSTEM\n\n"
-            "1. Upload the required data files (Classrooms, Courses, Students).\n"
-            "2. Configure the exam calendar (start date and duration).\n"
-            "3. Generate exam time slots automatically or edit them manually.\n"
-            "4. Click 'Generate Schedule' to create the exam timetable.\n"
-            "5. View results in different formats and export them if needed.\n"
-            "6. Compare with compare buttons the differences between the current input data and previously saved versions.",
-        "links": []
-    },
-
-    "input": {
-        "title": "Input File Information",
-        "content":
-            "INPUT FILE FORMAT INFORMATION\n\n"
-            "Classroom List:\n"
-            "- classroom_code, capacity\n\n"
-            "Course List:\n"
-            "- course_code, student_id\n\n"
-            "Student List:\n"
-            "- student_id, course_code\n\n"
-            "Files can be provided in CSV or PDF format.",
-        "links": []
-    },
-
-    "rules": {
-        "title": "Rules and Constraints",
-        "content":
-            "RULES AND CONSTRAINTS\n\n"
-            "- A student cannot have more than one exam at the same time.\n"
-            "- A classroom cannot host multiple exams in the same time slot.\n"
-            "- Classroom capacity must be sufficient for assigned students.\n"
-            "- Each course is scheduled exactly once.\n"
-            "- The system stops automatically if no valid solution is found.",
-        "links": []
-    },
-
-    "about": {
-        "title": "About",
-        "content":
-            "ABOUT EXAMTABLE MANAGER\n\n"
-            "Examtable Manager is an automatic exam scheduling system\n"
-            "developed as part of the SE-302 Software Engineering course.\n\n"
-            "The system uses constraint-based logic to generate\n"
-            "conflict-free exam timetables.",
-        "links": []
-    }
-}
-
-        
+            "index": {
+                "title": "Help Menu",
+                "content": "EXAMTABLE MANAGER - Help Topics\n\nClick on any topic below for detailed help:\n\n1. Uploading Data Files\n2. Setting Exam Calendar\n3. Generating Time Slots\n4. Creating Schedule\n5. Exporting Results",
+                "links": [
+                    ("Uploading Data Files", "upload"),
+                    ("Setting Exam Calendar", "calendar"),
+                    ("Generating Time Slots", "slots"),
+                    ("Creating Schedule", "schedule"),
+                    ("Exporting Results", "export")
+                ]
+            },
+            "upload": {
+                "title": "Uploading Data Files",
+                "content": "UPLOADING DATA FILES\n\nRequired for scheduling:\n- Classroom List (classroom codes and capacities)\n- Attendance List (per-course attendance lists)\n\nOptional:\n- Course List: a simple course list with optional durations (e.g. CourseCode_01 or CourseCode_01;90)\n  If durations are omitted, the GUI slot duration will be used as the exam duration.\n- Student List: plain list of student IDs (used for statistics / DB)\n\nHow to upload:\n1. Click 'Select File...' next to each data type\n2. Choose your CSV or TXT file\n3. Green status indicates successful upload\n\nFile Format Examples:\n- Classroom List: Classroom_01;40\n- Attendance List:\n  CourseCode_01\n  ['Std_ID_001', 'Std_ID_002']\n  CourseCode_02\n  ['Std_ID_003', 'Std_ID_004']\n- Course List: CourseCode_01 or CourseCode_01;90\n- Student List: Std_ID_001",
+                "links": []
+            },
+            "calendar": {
+                "title": "Setting Exam Calendar",
+                "content": "SETTING EXAM CALENDAR\n\n1. Choose Start Date using the date picker\n2. Set Duration (number of days for exams)\n3. Click 'Generate Schedule' when ready\n\nTips:\n- Start Date: When your exams begin\n- Duration: Total number of days for all exams",
+                "links": []
+            },
+            "slots": {
+                "title": "Generating Time Slots",
+                "content": "GENERATING TIME SLOTS\n\n1. Set Start Time (e.g., 09:00)\n2. Set End Time (e.g., 17:00)\n3. Set Slot Duration in minutes (e.g., 60)\n4. Click '⚡ Generate Slots'\n\nExample:\n- Start: 09:00\n- End: 17:00\n- Duration: 60 min\n- Result: 09:00-10:00, 10:00-11:00, etc.",
+                "links": []
+            },
+            "schedule": {
+                "title": "Creating Schedule",
+                "content": "CREATING SCHEDULE\n\n1. Upload all required data files\n2. Configure calendar and time slots\n3. Click 'GENERATE SCHEDULE'\n\nThe system will automatically:\n- Assign courses to time slots\n- Allocate appropriate classrooms\n- Avoid scheduling conflicts\n- Respect classroom capacity\n\nView results in multiple formats after generation.",
+                "links": []
+            },
+            "export": {
+                "title": "Exporting Results",
+                "content": "EXPORTING RESULTS\n\n1. Go to 'SCHEDULE (RESULT)' tab\n2. Select desired view format:\n   - General Schedule: Overview of all exams\n   - Daily Plan: Organized by day\n   - Student Based: View by student\n   - Classroom Based: View by classroom\n3. Click 'Export CSV' or 'Export PDF'\n4. Choose location to save",
+                "links": []
+            }
+        }
 
         # Current page tracking
         current_page = {"page": "index"}
