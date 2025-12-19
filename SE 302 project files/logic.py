@@ -311,6 +311,101 @@ class ScheduleSystem:
 
         return "\n".join(lines)
 
+    def compare_with_slot_summary(self, slot: int = 1):
+        """
+        Returns numeric diff summary between CURRENT (memory) and DB save slot.
+        """
+        snap = self.db.get_slot_snapshot(slot)
+
+        # CURRENT (memory)
+        cur_classrooms = {r.code: r.capacity for r in self.classrooms}
+        cur_students = set(self.all_students_list) if self.all_students_list else set()
+        cur_courses = {c.code: set(c.students) for c in self.courses}
+
+        # DB snapshot
+        db_cls = snap["classrooms"]  # dict code->cap
+        db_students = snap["students"]  # set
+        db_courses = snap["courses"]  # dict course->set(student_ids)
+
+        # Classrooms
+        cls_missing_in_db = set(cur_classrooms) - set(db_cls)
+        cls_extra_in_db = set(db_cls) - set(cur_classrooms)
+        cap_changed = [
+            code for code in (set(cur_classrooms) & set(db_cls))
+            if cur_classrooms[code] != db_cls[code]
+        ]
+
+        # Students
+        st_missing_in_db = cur_students - db_students
+        st_extra_in_db = db_students - cur_students
+
+        # Courses
+        crs_missing_in_db = set(cur_courses) - set(db_courses)
+        crs_extra_in_db = set(db_courses) - set(cur_courses)
+
+        # Per-course student diffs (counts)
+        per_course_diff_count = 0
+        total_cur_not_db = 0
+        total_db_not_cur = 0
+        for code in (set(cur_courses) & set(db_courses)):
+            cur_set = cur_courses[code]
+            db_set = db_courses[code]
+            a = cur_set - db_set
+            b = db_set - cur_set
+            if a or b:
+                per_course_diff_count += 1
+                total_cur_not_db += len(a)
+                total_db_not_cur += len(b)
+
+        summary = {
+            "slot": slot,
+
+            "classrooms_current": len(cur_classrooms),
+            "classrooms_db": len(db_cls),
+            "classrooms_missing_in_db": len(cls_missing_in_db),
+            "classrooms_extra_in_db": len(cls_extra_in_db),
+            "classrooms_capacity_changed": len(cap_changed),
+
+            "students_current": len(cur_students),
+            "students_db": len(db_students),
+            "students_missing_in_db": len(st_missing_in_db),
+            "students_extra_in_db": len(st_extra_in_db),
+
+            "courses_current": len(cur_courses),
+            "courses_db": len(db_courses),
+            "courses_missing_in_db": len(crs_missing_in_db),
+            "courses_extra_in_db": len(crs_extra_in_db),
+
+            "courses_with_student_diff": per_course_diff_count,
+            "total_students_current_not_db_in_common_courses": total_cur_not_db,
+            "total_students_db_not_current_in_common_courses": total_db_not_cur,
+        }
+
+        # GUI'de direkt göstermek için kısa bir metin de üretelim
+        msg_lines = [
+            f"Compare (Numeric) vs Save {slot}",
+            "",
+            f"Classrooms  | DB={summary['classrooms_db']}  Current={summary['classrooms_current']}",
+            f"  Missing in DB: {summary['classrooms_missing_in_db']}",
+            f"  Extra in DB  : {summary['classrooms_extra_in_db']}",
+            f"  Capacity diff: {summary['classrooms_capacity_changed']}",
+            "",
+            f"Students    | DB={summary['students_db']}  Current={summary['students_current']}",
+            f"  Missing in DB: {summary['students_missing_in_db']}",
+            f"  Extra in DB  : {summary['students_extra_in_db']}",
+            "",
+            f"Courses     | DB={summary['courses_db']}  Current={summary['courses_current']}",
+            f"  Missing in DB: {summary['courses_missing_in_db']}",
+            f"  Extra in DB  : {summary['courses_extra_in_db']}",
+            "",
+            f"Course->Student diffs:",
+            f"  Courses with diff: {summary['courses_with_student_diff']}",
+            f"  Current-not-DB (total): {summary['total_students_current_not_db_in_common_courses']}",
+            f"  DB-not-Current (total): {summary['total_students_db_not_current_in_common_courses']}",
+        ]
+
+        return summary, "\n".join(msg_lines)
+
     def _backtrack(self, course_list, index, student_agenda, start_time):
         if self.stop_event.is_set():
             return False
