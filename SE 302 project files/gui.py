@@ -452,7 +452,7 @@ class ExamSchedulerApp:
         scrollx.config(command=self.tree.xview)
         scrolly.pack(side="right", fill="y")
         scrollx.pack(side="bottom", fill="x")
-        self.tree.pack(side="left", fill="both", expand=True)
+        self.tree.pack(side="left", fill="y")
         # keep references for switching views
         self.schedule_center = center_frame
         self.tree_scrolly = scrolly
@@ -1025,12 +1025,14 @@ class ExamSchedulerApp:
         courses = self.student_groups.get(sid, [])
         cols = ["Course", "Date", "Time", "Classroom"]
         tbl_frame = tk.Frame(self.student_frame, bg=self.colors["bg_white"])
-        tbl_frame.pack(fill='x', padx=10, pady=8)
+        # don't force the frame to stretch horizontally; let the tree's column widths define table width
+        tbl_frame.pack(fill='both', expand=False, padx=10, pady=8)
 
         tbl_height = max(1, min(len(courses), 40))
         tbl = ttk.Treeview(tbl_frame, columns=cols, show='headings', height=tbl_height)
         for c in cols:
             tbl.heading(c, text=c)
+        # Fixed column widths chosen so the total table width is consistent across views
         tbl.column("Course", width=300)
         tbl.column("Date", width=140, anchor='center')
         tbl.column("Time", width=140, anchor='center')
@@ -1043,8 +1045,8 @@ class ExamSchedulerApp:
             time_part = parts[-1] if len(parts) > 1 else ""
             tbl.insert('', 'end', values=(c_code, date_part, time_part, r_code))
 
-        # pack table so its vertical size matches rows (no expand)
-        tbl.pack(fill='x')
+        # pack table so its vertical size matches rows and it stays centered horizontally
+        tbl.pack(anchor='n')
 
         # ensure visible top
         try:
@@ -1073,20 +1075,24 @@ class ExamSchedulerApp:
         rows = self.day_groups.get(date_str, [])
         cols = ["Time", "Course", "Classroom", "Students"]
         tbl_frame = tk.Frame(self.day_frame, bg=self.colors["bg_white"])
-        tbl_frame.pack(fill='x', padx=10, pady=8)
+        # do not force horizontal stretch; the tree will use the sum of its column widths
+        tbl_frame.pack(fill='both', expand=False, padx=10, pady=8)
 
-        tbl = ttk.Treeview(tbl_frame, columns=cols, show='headings', height=15)
+        tbl_height = max(1, min(len(rows), 40))
+        tbl = ttk.Treeview(tbl_frame, columns=cols, show='headings', height=tbl_height)
         for c in cols:
             tbl.heading(c, text=c)
-        tbl.column("Time", width=200, anchor='center')
-        tbl.column("Course", width=300)
-        tbl.column("Classroom", width=180, anchor='center')
-        tbl.column("Students", width=100, anchor='center')
+        # Match the student table total width (300+140+140+160 = 740)
+        tbl.column("Time", width=140, anchor='center')
+        tbl.column("Course", width=300, anchor='center')
+        tbl.column("Classroom", width=160, anchor='center')
+        tbl.column("Students", width=140, anchor='center')
 
         for time_str, c_code, r_names, st_cnt in rows:
             tbl.insert('', 'end', values=(time_str, c_code, r_names, st_cnt))
 
-        tbl.pack(fill='both', expand=True)
+        # anchor at top-center; height is controlled by number of rows so there is no extra space below
+        tbl.pack(anchor='n')
         try:
             tbl.yview_moveto(0)
         except Exception:
