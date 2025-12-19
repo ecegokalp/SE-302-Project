@@ -162,8 +162,8 @@ class ExamSchedulerApp:
         frame_files.pack(side='top', fill='x', pady=(0, 20), anchor='n')
 
         self.create_file_row(frame_files, "Classroom List:", self.imp_rooms)
-        self.create_file_row(frame_files, "Course List:", self.imp_courses)
         self.create_file_row(frame_files, "Attendance List:", self.imp_attendance)
+        self.create_file_row(frame_files, "Course List:", self.imp_courses)
         self.create_file_row(frame_files, "Student List:", self.imp_students)
 
         # DB Buttons (Merged from Code 2)
@@ -472,10 +472,36 @@ class ExamSchedulerApp:
         self.tree_scrollx = scrollx
         self.set_columns_daily()
 
-    def get_real_datetime(self, d, s):
+    def get_real_datetime(self, d, s, course_code=None):
         date = self.start_date + timedelta(days=d)
-        time = self.slot_times[s] if s < len(self.slot_times) else "??"
         days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        
+        # If course_code is provided, calculate the actual exam duration
+        if course_code:
+            course = next((c for c in self.system.courses if c.code == course_code), None)
+            if course and s < len(self.slot_times):
+                # Get start time from first slot
+                start_time_str = self.slot_times[s].split('-')[0].strip()
+                # Calculate actual end time based on exam duration
+                try:
+                    start_time = datetime.strptime(start_time_str, "%H:%M")
+                    end_time = start_time + timedelta(minutes=course.duration)
+                    end_time_str = end_time.strftime("%H:%M")
+                    time = f"{start_time_str}-{end_time_str}"
+                except:
+                    # Fallback to slot-based calculation
+                    slots_needed = self.system.get_slots_needed(course)
+                    end_slot_index = s + slots_needed - 1
+                    if end_slot_index < len(self.slot_times):
+                        end_time_str = self.slot_times[end_slot_index].split('-')[1].strip()
+                        time = f"{start_time_str}-{end_time_str}"
+                    else:
+                        time = self.slot_times[s]
+            else:
+                time = self.slot_times[s] if s < len(self.slot_times) else "??"
+        else:
+            time = self.slot_times[s] if s < len(self.slot_times) else "??"
+        
         return f"{date.strftime('%Y-%m-%d')} ({days[date.weekday()]}) {time}"
 
     def get_day_and_date(self, d):
@@ -552,7 +578,7 @@ class ExamSchedulerApp:
                 st_cnt = len(c.students) if c else 0
                 r_names = ", ".join([r.code for r in rooms])
                 cap = f"{st_cnt} / {sum(r.capacity for r in rooms)}"
-                self.full_data.append((c_code, self.get_real_datetime(d,s), st_cnt, r_names, cap))
+                self.full_data.append((c_code, self.get_real_datetime(d, s, c_code), st_cnt, r_names, cap))
         elif mode == "Daily Plan":
             # Build per-day selectable view: date picker + table for chosen day
             # collect assignments per date string
@@ -560,8 +586,26 @@ class ExamSchedulerApp:
             day_groups = defaultdict(list)
             for c_code, (d, s, rooms) in self.system.assignments.items():
                 date = (self.start_date + timedelta(days=d)).strftime('%Y-%m-%d')
-                time_str = self.slot_times[s] if s < len(self.slot_times) else '??'
+                # Calculate actual time span for this exam based on its duration
                 c = next((x for x in self.system.courses if x.code == c_code), None)
+                if c and s < len(self.slot_times):
+                    start_time_str = self.slot_times[s].split('-')[0].strip()
+                    try:
+                        start_time = datetime.strptime(start_time_str, "%H:%M")
+                        end_time = start_time + timedelta(minutes=c.duration)
+                        end_time_str = end_time.strftime("%H:%M")
+                        time_str = f"{start_time_str}-{end_time_str}"
+                    except:
+                        # Fallback to slot-based calculation
+                        slots_needed = self.system.get_slots_needed(c)
+                        end_slot = s + slots_needed - 1
+                        if end_slot < len(self.slot_times):
+                            end_time_str = self.slot_times[end_slot].split('-')[1].strip()
+                            time_str = f"{start_time_str}-{end_time_str}"
+                        else:
+                            time_str = self.slot_times[s]
+                else:
+                    time_str = self.slot_times[s] if s < len(self.slot_times) else '??'
                 st_cnt = len(c.students) if c else 0
                 r_names = ", ".join([r.code for r in rooms])
                 day_groups[date].append((time_str, c_code, r_names, st_cnt))
@@ -626,7 +670,7 @@ class ExamSchedulerApp:
             for (sid, c_code), r_code in self.system.student_room_map.items():
                 if c_code in self.system.assignments:
                     d, s, _ = self.system.assignments[c_code]
-                    temp_data.append((sid, c_code, self.get_real_datetime(d, s), r_code))
+                    temp_data.append((sid, c_code, self.get_real_datetime(d, s, c_code), r_code))
             temp_data.sort(key=lambda x: (x[0], x[2]))
             self.full_data = temp_data
 
@@ -680,7 +724,7 @@ class ExamSchedulerApp:
             self.set_columns_classroom()
             for c_code, (d, s, rooms) in self.system.assignments.items():
                 for r in rooms:
-                    self.full_data.append((r.code, self.get_real_datetime(d,s), c_code, "OCCUPIED"))
+                    self.full_data.append((r.code, self.get_real_datetime(d, s, c_code), c_code, "OCCUPIED"))
             self.full_data.sort()
         for row in self.full_data: self.tree.insert('', 'end', values=row)
 

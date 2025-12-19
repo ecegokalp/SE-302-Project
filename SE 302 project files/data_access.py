@@ -73,17 +73,22 @@ def read_attendance_from_file(filepath):
     # Satır satır oku
     lines = content.split('\n')
     current_code = None
+    current_duration = None
 
     for line in lines:
         line = line.strip()
         if not line: continue
 
-        # Ders kodunu bul (Örn: CourseCode_01)
+        # Ders kodunu bul (Örn: CourseCode_01 or CourseCode_01;120)
         if "CourseCode_" in line:
             parts = re.split(r'[;:,\s]+', line)
+            current_code = None
+            current_duration = None
             for p in parts:
                 if "CourseCode_" in p:
                     current_code = p.strip()
+                elif p.isdigit():
+                    current_duration = int(p)
             continue
 
         # Öğrencileri bul (Std_ID_01)
@@ -94,8 +99,11 @@ def read_attendance_from_file(filepath):
                 if existing:
                     existing.students.extend(students_in_line)
                     existing.students = list(set(existing.students))
+                    # Update duration if specified
+                    if current_duration is not None:
+                        existing.duration = current_duration
                 else:
-                    courses.append(Course(current_code, students_in_line))
+                    courses.append(Course(current_code, students_in_line, current_duration))
 
     return courses
 
