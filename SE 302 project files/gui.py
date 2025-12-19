@@ -166,13 +166,28 @@ class ExamSchedulerApp:
         self.create_file_row(frame_files, "Course List:", self.imp_courses)
         self.create_file_row(frame_files, "Student List:", self.imp_students)
 
-        # DB Buttons (Merged from Code 2)
+        # --- Database Save / Load / Compare (Slots) ---
         sep = ttk.Separator(frame_files, orient="horizontal")
         sep.pack(fill="x", pady=10)
+
         db_frame = tk.Frame(frame_files, bg=self.colors["bg_white"])
         db_frame.pack(fill='x', pady=2)
-        ttk.Button(db_frame, text="💾 Save to Database", command=self.save_to_db).pack(side='left', padx=5)
-        ttk.Button(db_frame, text="📥 Load from Database", command=self.load_from_db).pack(side='left', padx=5)
+
+        row1 = tk.Frame(db_frame, bg=self.colors["bg_white"])
+        row1.pack(fill='x', pady=(0, 6))
+
+        row2 = tk.Frame(db_frame, bg=self.colors["bg_white"])
+        row2.pack(fill='x')
+
+        ttk.Button(row1, text="💾 Save 1", command=lambda: self.save_to_db_slot(1)).pack(side='left', padx=5)
+        ttk.Button(row1, text="📥 Load 1", command=lambda: self.load_from_db_slot(1)).pack(side='left', padx=5)
+        ttk.Button(row1, text="💾 Save 2", command=lambda: self.save_to_db_slot(2)).pack(side='left', padx=5)
+        ttk.Button(row1, text="📥 Load 2", command=lambda: self.load_from_db_slot(2)).pack(side='left', padx=5)
+
+        ttk.Button(row2, text="🔍 Compare with Save 1", command=lambda: self.compare_with_save(1)).pack(side='left',
+                                                                                                       padx=5)
+        ttk.Button(row2, text="🔍 Compare with Save 2", command=lambda: self.compare_with_save(2)).pack(side='left',
+                                                                                                       padx=5)
 
         # --- 2. Calendar Section ---
         frame_time = tk.LabelFrame(left_col, text="2. Exam Calendar Settings", **lf_style)
@@ -351,6 +366,46 @@ class ExamSchedulerApp:
         except Exception as e:
             messagebox.showerror("Database Error", str(e))
             self.append_log(f"DB Load Error: {str(e)}")
+
+    def save_to_db_slot(self, slot: int):
+        try:
+            self.system.save_data_to_db(slot)
+            messagebox.showinfo("Database", f"Saved to Save {slot} ✅")
+            self.append_log(f"Data saved to DB (Save {slot})")
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+            self.append_log(f"DB Save Error (Save {slot}): {str(e)}")
+
+    def load_from_db_slot(self, slot: int):
+        try:
+            self.system.load_data_from_db(slot)
+
+            c = len(self.system.classrooms)
+            crs = len(self.system.courses)
+            st = len(self.system.all_students_list)
+
+            if c == 0 or crs == 0:
+                messagebox.showwarning("Database", f"Save {slot} loaded but empty!")
+                return
+
+            messagebox.showinfo(
+                "Database",
+                f"Loaded from Save {slot} ✅\n"
+                f"Classrooms: {c}\nCourses: {crs}\nStudents: {st}"
+            )
+            self.append_log(f"Loaded DB Save {slot}: {c} rooms, {crs} courses, {st} students")
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+            self.append_log(f"DB Load Error (Save {slot}): {str(e)}")
+
+    def compare_with_save(self, slot: int):
+        try:
+            result = self.system.compare_with_slot_detailed(slot)
+            messagebox.showinfo(f"Compare with Save {slot}", result)
+            self.append_log(f"Compared current data with Save {slot}")
+        except Exception as e:
+            messagebox.showerror("Compare Error", str(e))
+            self.append_log(f"Compare Error (Save {slot}): {str(e)}")
 
     def start_process(self):
         # Required for scheduling: classrooms and attendance (course->students)
