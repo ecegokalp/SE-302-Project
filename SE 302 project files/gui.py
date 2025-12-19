@@ -931,43 +931,74 @@ class ExamSchedulerApp:
 
         # Help content pages
         help_pages = {
-            "index": {
-                "title": "Help Menu",
-                "content": "EXAMTABLE MANAGER - Help Topics\n\nClick on any topic below for detailed help:\n\n1. Uploading Data Files\n2. Setting Exam Calendar\n3. Generating Time Slots\n4. Creating Schedule\n5. Exporting Results",
-                "links": [
-                    ("Uploading Data Files", "upload"),
-                    ("Setting Exam Calendar", "calendar"),
-                    ("Generating Time Slots", "slots"),
-                    ("Creating Schedule", "schedule"),
-                    ("Exporting Results", "export")
-                ]
-            },
-            "upload": {
-                "title": "Uploading Data Files",
-                "content": "UPLOADING DATA FILES\n\nRequired for scheduling:\n- Classroom List (classroom codes and capacities)\n- Attendance List (per-course attendance lists)\n\nOptional:\n- Course List: a simple course list with optional durations (e.g. CourseCode_01 or CourseCode_01;90)\n  If durations are omitted, the GUI slot duration will be used as the exam duration.\n- Student List: plain list of student IDs (used for statistics / DB)\n\nHow to upload:\n1. Click 'Select File...' next to each data type\n2. Choose your CSV or TXT file\n3. Green status indicates successful upload\n\nFile Format Examples:\n- Classroom List: Classroom_01;40\n- Attendance List:\n  CourseCode_01\n  ['Std_ID_001', 'Std_ID_002']\n  CourseCode_02\n  ['Std_ID_003', 'Std_ID_004']\n- Course List: CourseCode_01 or CourseCode_01;90\n- Student List: Std_ID_001",
-                "links": []
-            },
-            "calendar": {
-                "title": "Setting Exam Calendar",
-                "content": "SETTING EXAM CALENDAR\n\n1. Choose Start Date using the date picker\n2. Set Duration (number of days for exams)\n3. Click 'Generate Schedule' when ready\n\nTips:\n- Start Date: When your exams begin\n- Duration: Total number of days for all exams",
-                "links": []
-            },
-            "slots": {
-                "title": "Generating Time Slots",
-                "content": "GENERATING TIME SLOTS\n\n1. Set Start Time (e.g., 09:00)\n2. Set End Time (e.g., 17:00)\n3. Set Slot Duration in minutes (e.g., 60)\n4. Click '⚡ Generate Slots'\n\nExample:\n- Start: 09:00\n- End: 17:00\n- Duration: 60 min\n- Result: 09:00-10:00, 10:00-11:00, etc.",
-                "links": []
-            },
-            "schedule": {
-                "title": "Creating Schedule",
-                "content": "CREATING SCHEDULE\n\n1. Upload all required data files\n2. Configure calendar and time slots\n3. Click 'GENERATE SCHEDULE'\n\nThe system will automatically:\n- Assign courses to time slots\n- Allocate appropriate classrooms\n- Avoid scheduling conflicts\n- Respect classroom capacity\n\nView results in multiple formats after generation.",
-                "links": []
-            },
-            "export": {
-                "title": "Exporting Results",
-                "content": "EXPORTING RESULTS\n\n1. Go to 'SCHEDULE (RESULT)' tab\n2. Select desired view format:\n   - General Schedule: Overview of all exams\n   - Daily Plan: Organized by day\n   - Student Based: View by student\n   - Classroom Based: View by classroom\n3. Click 'Export CSV' or 'Export PDF'\n4. Choose location to save",
-                "links": []
-            }
-        }
+            
+    "index": {
+        "title": "Help Menu",
+        "content":
+            "EXAMTABLE MANAGER – HELP MENU\n\n"
+            "Select a topic below to learn how to use the system.\n\n"
+            "1. How to Use\n"
+            "2. Input File Information\n"
+            "3. Rules and Constraints\n"
+            "4. About",
+        "links": [
+            ("How to Use", "howto"),
+            ("Input File Info", "input"),
+            ("Rules and Constraints", "rules"),
+            ("About", "about")
+        ]
+    },
+
+    "howto": {
+        "title": "How to Use",
+        "content":
+            "HOW TO USE THE SYSTEM\n\n"
+            "1. Upload the required data files (Classrooms, Courses, Students).\n"
+            "2. Configure the exam calendar (start date and duration).\n"
+            "3. Generate exam time slots automatically or edit them manually.\n"
+            "4. Click 'Generate Schedule' to create the exam timetable.\n"
+            "5. View results in different formats and export them if needed.",
+        "links": []
+    },
+
+    "input": {
+        "title": "Input File Information",
+        "content":
+            "INPUT FILE FORMAT INFORMATION\n\n"
+            "Classroom List:\n"
+            "- classroom_code, capacity\n\n"
+            "Course List:\n"
+            "- course_code, student_id\n\n"
+            "Student List:\n"
+            "- student_id, course_code\n\n"
+            "Files can be provided in CSV or TXT format.",
+        "links": []
+    },
+
+    "rules": {
+        "title": "Rules and Constraints",
+        "content":
+            "RULES AND CONSTRAINTS\n\n"
+            "- A student cannot have more than one exam at the same time.\n"
+            "- A classroom cannot host multiple exams in the same time slot.\n"
+            "- Classroom capacity must be sufficient for assigned students.\n"
+            "- Each course is scheduled exactly once.\n"
+            "- The system stops automatically if no valid solution is found.",
+        "links": []
+    },
+
+    "about": {
+        "title": "About",
+        "content":
+            "ABOUT EXAMTABLE MANAGER\n\n"
+            "Examtable Manager is an automatic exam scheduling system\n"
+            "developed as part of the SE-302 Software Engineering course.\n\n"
+            "The system uses constraint-based logic to generate\n"
+            "conflict-free exam timetables.",
+        "links": []
+    }
+}
+
 
         # Current page tracking
         current_page = {"page": "index"}
