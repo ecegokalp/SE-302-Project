@@ -138,126 +138,154 @@ class ExamSchedulerApp:
         container_frame.bind("<Configure>", _on_frame_configure)
         container_canvas.bind("<Configure>", _on_canvas_configure)
 
-        container_canvas.pack(side='left', fill='both', expand=True, padx=40, pady=20)
+        container_canvas.pack(side='left', fill='both', expand=True, padx=5, pady=5)
         scrollbar_y.pack(side='right', fill='y')
         container_canvas.configure(yscrollcommand=scrollbar_y.set)
 
-        lf_style = {"font": ('Segoe UI', 11, 'bold'), "bg": self.colors["bg_white"],
-                    "fg": self.colors["primary"], "padx": 20, "pady": 15}
+        lf_style = {"font": ('Segoe UI', 10, 'bold'), "bg": self.colors["bg_white"],
+                    "fg": "#546e7a", "padx": 15, "pady": 15}
 
         # Two-column layout
         columns_frame = tk.Frame(container_frame, bg=self.colors["bg_white"])
-        columns_frame.pack(fill='both', expand=True)
+        # Removed extra padding to maximize space
+        columns_frame.pack(fill='both', expand=True, pady=0)
 
-        # Left Column: Settings
+        # Left Column: Settings (Give it weight)
         left_col = tk.Frame(columns_frame, bg=self.colors["bg_white"])
         left_col.pack(side='left', fill='both', expand=True, padx=(0, 10))
 
-        # Right Column: Logs
-        right_col = tk.Frame(columns_frame, bg=self.colors["bg_white"], width=360)
-        right_col.pack(side='right', fill='y', padx=(10, 0))
+        # Right Column: Logs (Give it weight)
+        right_col = tk.Frame(columns_frame, bg=self.colors["bg_white"])
+        right_col.pack(side='right', fill='both', expand=True, padx=(10, 0))
 
-        # --- 1. Files Section ---
-        frame_files = tk.LabelFrame(left_col, text="1. Data Files (CSV/TXT)", **lf_style)
-        frame_files.pack(side='top', fill='x', pady=(0, 20), anchor='n')
+        # --- 1. Data Management (Files & Database) ---
+        frame_files = tk.LabelFrame(left_col, text="1. Data Management (Files & Database)", **lf_style)
+        frame_files.pack(side='top', fill='both', pady=(0, 5), anchor='n')
 
-        self.create_file_row(frame_files, "Classroom List:", self.imp_rooms)
-        self.create_file_row(frame_files, "Attendance List:", self.imp_attendance)
-        self.create_file_row(frame_files, "Course List:", self.imp_courses)
-        self.create_file_row(frame_files, "Student List:", self.imp_students)
+        # Split into Left (Files) and Right (DB Actions) - Use grid for better control or pack with expand
+        files_inner = tk.Frame(frame_files, bg=self.colors["bg_white"])
+        files_inner.pack(fill='both', expand=True)
 
-        # --- Database Save / Load / Compare (Slots) ---
-        sep = ttk.Separator(frame_files, orient="horizontal")
-        sep.pack(fill="x", pady=10)
+        files_col = tk.Frame(files_inner, bg=self.colors["bg_white"])
+        files_col.pack(side='left', fill='both', expand=True)
+        
+        # Vertical Separator
+        ttk.Separator(files_inner, orient='vertical').pack(side='left', fill='y', padx=10, pady=5)
+        
+        db_col = tk.Frame(files_inner, bg=self.colors["bg_white"])
+        db_col.pack(side='right', fill='both', padx=(0, 10), anchor='n')
+        
+        # Files Column (Anchor w to keep left aligned)
+        self.create_file_row(files_col, "Classrooms & Caps:", self.imp_rooms)
+        self.create_file_row(files_col, "Attendance Lists:", self.imp_attendance)
+        self.create_file_row(files_col, "All Courses:", self.imp_courses)
+        self.create_file_row(files_col, "All Students:", self.imp_students)
 
-        db_frame = tk.Frame(frame_files, bg=self.colors["bg_white"])
-        db_frame.pack(fill='x', pady=2)
+        # DB Column Actions
+        tk.Label(db_col, text="Database Actions", bg=self.colors["bg_white"], fg="#90a4ae", font=('Segoe UI', 8, 'bold')).pack(pady=(0,5))
+        
+        db_btn_frame = tk.Frame(db_col, bg=self.colors["bg_white"])
+        db_btn_frame.pack(anchor='center')
+        
+        # 2x2 Grid for DB buttons - Fixed width and padding
+        # Use ipadx inside button style if needed, or just rely on width
+        btn_w = 11  # Increased from 9 to 11 to fit "Comp 1"
+        pad_x = 5
+        pad_y = 5
+        
+        ttk.Button(db_btn_frame, text="💾 Save 1", width=btn_w, command=lambda: self.save_to_db_slot(1)).grid(row=0, column=0, padx=pad_x, pady=pad_y)
+        ttk.Button(db_btn_frame, text="📥 Load 1", width=btn_w, command=lambda: self.load_from_db_slot(1)).grid(row=0, column=1, padx=pad_x, pady=pad_y)
+        ttk.Button(db_btn_frame, text="💾 Save 2", width=btn_w, command=lambda: self.save_to_db_slot(2)).grid(row=1, column=0, padx=pad_x, pady=pad_y)
+        ttk.Button(db_btn_frame, text="📥 Load 2", width=btn_w, command=lambda: self.load_from_db_slot(2)).grid(row=1, column=1, padx=pad_x, pady=pad_y)
+        
+        ttk.Button(db_btn_frame, text="📌 Comp 1", width=btn_w, command=lambda: self.compare_with_save(1)).grid(row=2, column=0, padx=pad_x, pady=pad_y)
+        ttk.Button(db_btn_frame, text="📌 Comp 2", width=btn_w, command=lambda: self.compare_with_save(2)).grid(row=2, column=1, padx=pad_x, pady=pad_y)
 
-        row1 = tk.Frame(db_frame, bg=self.colors["bg_white"])
-        row1.pack(fill='x', pady=(0, 6))
 
-        row2 = tk.Frame(db_frame, bg=self.colors["bg_white"])
-        row2.pack(fill='x')
-
-        ttk.Button(row1, text="💾 Save 1", command=lambda: self.save_to_db_slot(1)).pack(side='left', padx=5)
-        ttk.Button(row1, text="📥 Load 1", command=lambda: self.load_from_db_slot(1)).pack(side='left', padx=5)
-        ttk.Button(row1, text="💾 Save 2", command=lambda: self.save_to_db_slot(2)).pack(side='left', padx=5)
-        ttk.Button(row1, text="📥 Load 2", command=lambda: self.load_from_db_slot(2)).pack(side='left', padx=5)
-
-        ttk.Button(row2, text="🔍 Compare with Save 1", command=lambda: self.compare_with_save(1)).pack(side='left',
-                                                                                                       padx=5)
-        ttk.Button(row2, text="🔍 Compare with Save 2", command=lambda: self.compare_with_save(2)).pack(side='left',
-                                                                                                       padx=5)
-
-        # --- 2. Calendar Section ---
+        # --- 2. Exam Calendar Settings ---
         frame_time = tk.LabelFrame(left_col, text="2. Exam Calendar Settings", **lf_style)
         frame_time.pack(side='top', fill='both', expand=True, pady=(0, 10))
 
-        row_date = tk.Frame(frame_time, bg=self.colors["bg_white"])
-        row_date.pack(fill='x', pady=5)
+        # Use Grid for frame_time to ensure footer stays at bottom
+        frame_time.grid_columnconfigure(0, weight=1)
+        frame_time.grid_rowconfigure(3, weight=1) # Listbox row gets all space
 
+        # Date & Duration Row
+        row_date = tk.Frame(frame_time, bg=self.colors["bg_white"])
+        row_date.grid(row=0, column=0, sticky='ew', pady=5)
+        
         tk.Label(row_date, text="Start Date:", bg=self.colors["bg_white"], width=10, anchor='w').pack(side='left')
         if HAS_CALENDAR:
-            self.ent_date = DateEntry(row_date, width=15, background=self.colors["primary"], foreground='white', date_pattern='yyyy-mm-dd')
+            self.ent_date = DateEntry(row_date, width=13, background=self.colors["primary"], foreground='white', date_pattern='yyyy-mm-dd')
             self.ent_date.pack(side='left', padx=(0, 20))
         else:
-            self.ent_date = ttk.Entry(row_date, width=15)
+            self.ent_date = ttk.Entry(row_date, width=13)
             self.ent_date.insert(0, datetime.now().strftime("%Y-%m-%d"))
             self.ent_date.pack(side='left', padx=(0, 20))
 
-        tk.Label(row_date, text="Duration (Days):", bg=self.colors["bg_white"], width=12, anchor='w').pack(side='left')
+        tk.Label(row_date, text="Duration:", bg=self.colors["bg_white"], width=8, anchor='w').pack(side='left')
         self.ent_days = ttk.Entry(row_date, width=5)
         self.ent_days.insert(0, "7")
         self.ent_days.pack(side='left')
 
-        tk.Label(frame_time, text="Exam Slots Generator (Auto):", bg=self.colors["bg_white"], font=('Segoe UI', 9, 'bold'), anchor='w').pack(fill='x', pady=(15, 5))
+        # Generator Section
+        tk.Label(frame_time, text="Exam Slots Generator:", bg=self.colors["bg_white"], font=('Segoe UI', 9, 'bold')).grid(row=1, column=0, pady=(5, 2))
+        
+        auto_frame = tk.Frame(frame_time, bg="#eceff1", pady=5, padx=10)
+        auto_frame.grid(row=2, column=0, sticky='ew')
 
-        auto_frame = tk.Frame(frame_time, bg="#eceff1", pady=10, padx=10)
-        auto_frame.pack(fill='x')
-
-        tk.Label(auto_frame, text="Start (HH:MM):", bg="#eceff1").pack(side='left', padx=5)
-        self.ent_start_hour = ttk.Entry(auto_frame, width=8)
+        tk.Label(auto_frame, text="Start:", bg="#eceff1").pack(side='left', padx=5)
+        self.ent_start_hour = ttk.Entry(auto_frame, width=6)
         self.ent_start_hour.insert(0, "09:00")
         self.ent_start_hour.pack(side='left')
 
-        tk.Label(auto_frame, text="End (HH:MM):", bg="#eceff1").pack(side='left', padx=(15, 5))
-        self.ent_end_hour = ttk.Entry(auto_frame, width=8)
+        tk.Label(auto_frame, text="End:", bg="#eceff1").pack(side='left', padx=(10, 5))
+        self.ent_end_hour = ttk.Entry(auto_frame, width=6)
         self.ent_end_hour.insert(0, "17:00")
         self.ent_end_hour.pack(side='left')
 
-        tk.Label(auto_frame, text="Slot Min:", bg="#eceff1").pack(side='left', padx=(15, 5))
-        self.ent_duration_min = ttk.Entry(auto_frame, width=5)
+        tk.Label(auto_frame, text="Min:", bg="#eceff1").pack(side='left', padx=(10, 5))
+        self.ent_duration_min = ttk.Entry(auto_frame, width=4)
         self.ent_duration_min.insert(0, "60")
         self.ent_duration_min.pack(side='left')
 
-        ttk.Button(auto_frame, text="⚡ Generate Slots", command=self.generate_auto_slots).pack(side='left', padx=20)
+        ttk.Button(auto_frame, text="⚡ Generate", command=self.generate_auto_slots).pack(side='left', padx=15)
 
+        # Listbox for Slots (Fill remaining space)
         list_container = tk.Frame(frame_time, bg=self.colors["bg_white"])
-        list_container.pack(fill='both', expand=True, pady=10)
+        list_container.grid(row=3, column=0, sticky='nsew', pady=5)
 
         scrollbar = ttk.Scrollbar(list_container, orient="vertical")
-        self.lst_slots = tk.Listbox(list_container, borderwidth=1, relief="solid",
+        # Drastically reduced default height to prevent push-off, it will expand anyway
+        self.lst_slots = tk.Listbox(list_container, borderwidth=1, relief="solid", height=6,
                                     font=('Consolas', 11), yscrollcommand=scrollbar.set)
         scrollbar.config(command=self.lst_slots.yview)
 
         scrollbar.pack(side='right', fill='y')
         self.lst_slots.pack(side='left', fill='both', expand=True)
-
-        bottom_ctrl = tk.Frame(frame_time, bg=self.colors["bg_white"])
-        bottom_ctrl.pack(fill='x', pady=5)
-
-        ttk.Button(bottom_ctrl, text="Remove Selected (-)", style="Danger.TButton", command=self.remove_slot).pack(side='right')
-
+        
         default_times = ["09:00-11:00", "11:00-13:00", "13:30-15:30", "15:30-17:30"]
         for t in default_times: self.lst_slots.insert(tk.END, t)
 
-        # Activity log area
-        log_frame = tk.LabelFrame(right_col, text="Activity Log", **lf_style)
-        log_frame.pack(side='top', fill='both', expand=True, padx=(0, 0), pady=(0, 0))
+        # Remove Button - Row 4
+        bottom_ctrl = tk.Frame(frame_time, bg=self.colors["bg_white"])
+        bottom_ctrl.grid(row=4, column=0, sticky='ew', pady=5)
+        
+        btn_remove = tk.Button(bottom_ctrl, text="Remove Selected (-)", bg="#e53935", fg="white", 
+                               font=('Segoe UI', 9, 'bold'), relief='flat', padx=10, command=self.remove_slot)
+        btn_remove.pack(side='right')
 
-        self.txt_log = tk.Text(log_frame, height=30, bg="#111111", fg="#e6e6e6",
-                               font=('Consolas', 10), wrap='word', state='disabled', padx=8, pady=6)
-        log_scroll = ttk.Scrollbar(log_frame, orient='vertical', command=self.txt_log.yview)
+        # --- Activity Log ---
+        log_frame = tk.LabelFrame(right_col, text="Activity Log", **lf_style)
+        log_frame.pack(side='top', fill='both', expand=True)
+
+        # Container for text with padding to show white border
+        log_inner = tk.Frame(log_frame, bg=self.colors["bg_white"])
+        log_inner.pack(fill='both', expand=True, padx=10, pady=10)
+
+        self.txt_log = tk.Text(log_inner, height=15, bg="black", fg="#00ff00",
+                               font=('Consolas', 9), wrap='word', state='disabled', padx=8, pady=6)
+        log_scroll = ttk.Scrollbar(log_inner, orient='vertical', command=self.txt_log.yview)
         self.txt_log['yscrollcommand'] = log_scroll.set
         log_scroll.pack(side='right', fill='y')
         self.txt_log.pack(side='left', fill='both', expand=True)
@@ -297,7 +325,7 @@ class ExamSchedulerApp:
 
     def create_file_row(self, parent, label_text, command_func):
         f = tk.Frame(parent, bg=self.colors["bg_white"])
-        f.pack(fill='x', pady=5)
+        f.pack(fill='x', pady=2)
         tk.Label(f, text=label_text, width=20, anchor='w', bg=self.colors["bg_white"]).pack(side='left')
         ttk.Button(f, text="Select File...", command=command_func).pack(side='left')
         lbl_status = tk.Label(f, text="Not Selected", fg="#95a5a6", bg=self.colors["bg_white"], font=('Segoe UI', 9, 'italic'))
