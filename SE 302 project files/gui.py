@@ -48,6 +48,11 @@ class ExamSchedulerApp:
         self.full_data = []
 
         self.build_layout()
+        # start watching fullscreen state to show/hide scrollbars
+        try:
+            self.root.after(500, self.monitor_fullscreen)
+        except Exception:
+            pass
 
     def configure_styles(self):
         self.style.configure("Treeview", background=self.colors["bg_white"],
@@ -58,7 +63,8 @@ class ExamSchedulerApp:
         self.style.map("Treeview", background=[('selected', self.colors["primary_light"])],
                        foreground=[('selected', self.colors["bg_white"])])
 
-        self.style.configure("Big.Accent.TButton", font=('Segoe UI', 12, 'bold'),
+        # Slightly smaller accent button used for primary actions
+        self.style.configure("Big.Accent.TButton", font=('Segoe UI', 10, 'bold'),
                              background=self.colors["primary"], foreground=self.colors["bg_white"], borderwidth=0)
         self.style.map("Big.Accent.TButton", background=[('active', self.colors["primary_light"])])
 
@@ -73,18 +79,18 @@ class ExamSchedulerApp:
                        foreground=[('selected', self.colors["bg_white"])])
 
     def build_layout(self):
-        header_frame = tk.Frame(self.root, bg=self.colors["bg_white"], height=80)
+        header_frame = tk.Frame(self.root, bg=self.colors["bg_white"], height=56)
         header_frame.pack(fill='x', side='top')
         tk.Frame(header_frame, bg=self.colors["accent_line"], height=2).pack(side='bottom', fill='x')
 
         title_holder = tk.Frame(header_frame, bg=self.colors["bg_white"])
         title_holder.pack(fill='both', expand=True)
-        lbl_title = tk.Label(title_holder, text="EXAMTABLE MANAGER", font=('Segoe UI', 24, 'bold'),bg=self.colors["bg_white"], fg=self.colors["primary"])
-        lbl_title.pack(side='left', padx=20, pady=15)
+        lbl_title = tk.Label(title_holder, text="EXAMTABLE MANAGER", font=('Segoe UI', 18, 'bold'),bg=self.colors["bg_white"], fg=self.colors["primary"])
+        lbl_title.pack(side='left', padx=12, pady=10)
 
         # help button
         help_btn = ttk.Button(title_holder, text="? Help", command=self.show_help)
-        help_btn.pack(side='right', padx=20, pady=15)
+        help_btn.pack(side='right', padx=12, pady=10)
 
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill='both', expand=True, padx=20, pady=20)
@@ -104,10 +110,10 @@ class ExamSchedulerApp:
         bottom_area.pack(side='bottom', fill='x')
 
         self.btn_start = ttk.Button(bottom_area, text="GENERATE SCHEDULE", style="Big.Accent.TButton", command=self.start_process)
-        self.btn_start.pack(side='left', expand=True, padx=10, ipadx=40, ipady=10)
+        self.btn_start.pack(side='left', padx=8, ipadx=14, ipady=6)
 
         self.btn_stop = ttk.Button(bottom_area, text="STOP", command=self.stop_process, state='disabled')
-        self.btn_stop.pack(side='left', expand=True, padx=10, ipadx=20, ipady=10)
+        self.btn_stop.pack(side='left', padx=8, ipadx=8, ipady=6)
 
         self.lbl_log = tk.Label(self.tab_config, text="", bg=self.colors["bg_white"], fg=self.colors["primary"])
         self.lbl_log.pack(side='bottom', pady=(0, 5))
@@ -596,7 +602,10 @@ class ExamSchedulerApp:
                     pass
                 self._show_day_schedule(default_day)
             else:
-                lbl = tk.Label(self.schedule_center, text="No schedule data available.", bg=self.colors["bg_white"], fg=self.colors["text_body"])
+                # show message inside a dedicated day_frame so it can be destroyed cleanly
+                self.day_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
+                self.day_frame.pack(fill='both', expand=True)
+                lbl = tk.Label(self.day_frame, text="No schedule data available.", bg=self.colors["bg_white"], fg=self.colors["text_body"])
                 lbl.pack(pady=20)
         elif mode == "Student Based":
             # Build a searchable single-student view: show one student at a time
@@ -649,7 +658,10 @@ class ExamSchedulerApp:
                 self.search_var.set(default_sid)
                 self._show_student_schedule(default_sid)
             else:
-                lbl = tk.Label(self.schedule_center, text="No student assignments available.", bg=self.colors["bg_white"], fg=self.colors["text_body"])
+                # show message inside a dedicated student_frame so it can be destroyed cleanly
+                self.student_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
+                self.student_frame.pack(fill='both', expand=True)
+                lbl = tk.Label(self.student_frame, text="No student assignments available.", bg=self.colors["bg_white"], fg=self.colors["text_body"])
                 lbl.pack(pady=20)
         elif mode == "Classroom Based":
             self.set_columns_classroom()
@@ -1063,8 +1075,7 @@ class ExamSchedulerApp:
         tbl_frame = tk.Frame(self.day_frame, bg=self.colors["bg_white"])
         tbl_frame.pack(fill='x', padx=10, pady=8)
 
-        tbl_height = max(1, min(len(rows), 40))
-        tbl = ttk.Treeview(tbl_frame, columns=cols, show='headings', height=tbl_height)
+        tbl = ttk.Treeview(tbl_frame, columns=cols, show='headings', height=15)
         for c in cols:
             tbl.heading(c, text=c)
         tbl.column("Time", width=200, anchor='center')
@@ -1075,7 +1086,7 @@ class ExamSchedulerApp:
         for time_str, c_code, r_names, st_cnt in rows:
             tbl.insert('', 'end', values=(time_str, c_code, r_names, st_cnt))
 
-        tbl.pack(fill='x')
+        tbl.pack(fill='both', expand=True)
         try:
             tbl.yview_moveto(0)
         except Exception:
