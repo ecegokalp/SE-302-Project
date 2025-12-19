@@ -129,8 +129,26 @@ class ExamSchedulerApp:
 
         ttk.Separator(frame_files, orient="horizontal").pack(fill="x", pady=10)
 
-        ttk.Button(frame_files, text="💾 Save to Database", command=self.save_to_db).pack(anchor="w", pady=3)
-        ttk.Button(frame_files, text="📥 Load from Database", command=self.load_from_db).pack(anchor="w", pady=3)
+        # --- DB SLOT BUTTONS (YATAY) ---
+        db_slot_frame = ttk.LabelFrame(frame_files, text="Database Slots", style="NoGray.TLabelframe")
+        db_slot_frame.pack(fill="x", pady=10)
+
+        ttk.Button(db_slot_frame, text="💾 Save 1",
+                   command=lambda: self.save_to_db_slot(1)).pack(side="left", padx=5)
+
+        ttk.Button(db_slot_frame, text="📥 Load 1",
+                   command=lambda: self.load_from_db_slot(2)).pack(side="left", padx=5)
+
+        ttk.Button(db_slot_frame, text="💾 Save 2",
+                   command=lambda: self.save_to_db_slot(1)).pack(side="left", padx=5)
+
+        ttk.Button(db_slot_frame, text="📥 Load 2",
+                   command=lambda: self.load_from_db_slot(2)).pack(side="left", padx=5)
+
+        ttk.Button(db_slot_frame, text="🔎 Compare vs Save 1",
+                   command=lambda: self.compare_vs_slot(1)).pack(side="left", padx=15)
+        ttk.Button(db_slot_frame, text="Compare vs Save 2", command=lambda: self.compare_vs_slot(2)).pack(padx=5, pady=2,
+                                                                                                       side="left")
 
         frame_time = tk.LabelFrame(container, text="2. Exam Calendar Settings", **lf_style)
         frame_time.pack(side='top', fill='both', expand=True, pady=(0, 10))
@@ -538,6 +556,39 @@ class ExamSchedulerApp:
 
         except Exception as e:
             messagebox.showerror("Database Error", str(e))
+
+    def save_to_db_slot(self, slot: int):
+        try:
+            self.system.save_data_to_db(slot)
+            c = len(self.system.classrooms)
+            crs = len(self.system.courses)
+            sts = len(self.system.all_students_list)
+            messagebox.showinfo(
+                "Database",
+                f"Saved to Save {slot} ✅\nClassrooms={c}\nCourses={crs}\nStudents={sts}"
+            )
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+
+    def load_from_db_slot(self, slot: int):
+        try:
+            self.system.load_data_from_db(slot)
+            c = len(self.system.classrooms)
+            crs = len(self.system.courses)
+            sts = len(self.system.all_students_list)
+            messagebox.showinfo(
+                "Database",
+                f"Loaded from Save {slot} ✅\nClassrooms={c}\nCourses={crs}\nStudents={sts}"
+            )
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+
+    def compare_vs_slot(self, slot: int):
+        try:
+            report = self.system.compare_with_slot_detailed(slot)
+            messagebox.showinfo("Compare Result", report)
+        except Exception as e:
+            messagebox.showerror("Compare Error", str(e))
 
     def show_help(self):
         help_window = tk.Toplevel(self.root)
