@@ -1188,6 +1188,8 @@ class ExamSchedulerApp:
         # Help content pages
         help_pages = {
             
+   
+
     "index": {
         "title": "Help Menu",
         "content":
@@ -1196,10 +1198,10 @@ class ExamSchedulerApp:
             "1. How to Use\n"
             "2. Input File Information\n"
             "3. Rules and Constraints\n"
-            "4. About",
+            "4. About\n",
         "links": [
             ("How to Use", "howto"),
-            ("Input File Info", "input"),
+            ("Input File Information", "input"),
             ("Rules and Constraints", "rules"),
             ("About", "about")
         ]
@@ -1209,11 +1211,43 @@ class ExamSchedulerApp:
         "title": "How to Use",
         "content":
             "HOW TO USE THE SYSTEM\n\n"
-            "1. Upload the required data files (Classrooms, Courses, Students).\n"
-            "2. Configure the exam calendar (start date and duration).\n"
-            "3. Generate exam time slots automatically or edit them manually.\n"
-            "4. Click 'Generate Schedule' to create the exam timetable.\n"
-            "5. View results in different formats and export them if needed.",
+
+            "STEP 1 – DATA MANAGEMENT (Files & Database)\n"
+            "- Use the 'Select File...' buttons to upload:\n"
+            "  • Classrooms & Capacities\n"
+            "  • Attendance Lists\n"
+            "  • All Courses\n"
+            "  • All Students\n"
+            "- After a file is loaded successfully, its status will turn green.\n"
+            "- Database buttons (Save / Load / Compare) allow storing and comparing data states.\n\n"
+
+            "STEP 2 – EXAM CALENDAR SETTINGS\n"
+            "- Select the exam Start Date.\n"
+            "- Enter the total exam Duration (number of days).\n\n"
+
+            "STEP 3 – EXAM SLOTS GENERATOR\n"
+            "- Enter daily Start and End times.\n"
+            "- Specify the minimum exam duration (minutes).\n"
+            "- Click 'Generate' to automatically create time slots.\n"
+            "- Slots can be manually removed using 'Remove Selected (-)'.\n\n"
+
+            "STEP 4 – GENERATE SCHEDULE\n"
+            "- Click 'GENERATE SCHEDULE' to start automatic scheduling.\n"
+            "- The system assigns exams while respecting all constraints.\n"
+            "- You may stop the process at any time using the STOP button.\n\n"
+
+            "STEP 5 – VIEW RESULTS\n"
+            "- Switch to the 'SCHEDULE (RESULT)' tab.\n"
+            "- Choose different views:\n"
+            "  • General Schedule\n"
+            "  • Daily Plan\n"
+            "  • Student Based\n"
+            "  • Classroom Based\n"
+            "  • Exam Attendance\n\n"
+
+            "STEP 6 – EXPORT\n"
+            "- Export the generated schedule as CSV or PDF.\n"
+            "- Export options change depending on the selected view.\n",
         "links": []
     },
 
@@ -1221,13 +1255,20 @@ class ExamSchedulerApp:
         "title": "Input File Information",
         "content":
             "INPUT FILE FORMAT INFORMATION\n\n"
+
             "Classroom List:\n"
             "- classroom_code, capacity\n\n"
-            "Course List:\n"
+
+            "Attendance List:\n"
             "- course_code, student_id\n\n"
-            "Student List:\n"
-            "- student_id, course_code\n\n"
-            "Files can be provided in CSV or TXT format.",
+
+            "All Courses:\n"
+            "- course_code, duration (optional)\n\n"
+
+            "All Students:\n"
+            "- student_id\n\n"
+
+            "Supported file format: CSV\n",
         "links": []
     },
 
@@ -1236,10 +1277,10 @@ class ExamSchedulerApp:
         "content":
             "RULES AND CONSTRAINTS\n\n"
             "- A student cannot have more than one exam at the same time.\n"
-            "- A classroom cannot host multiple exams in the same time slot.\n"
-            "- Classroom capacity must be sufficient for assigned students.\n"
+            "- A classroom cannot host multiple exams in the same slot.\n"
+            "- Classroom capacity must be sufficient for enrolled students.\n"
             "- Each course is scheduled exactly once.\n"
-            "- The system stops automatically if no valid solution is found.",
+            "- The system stops automatically if no valid solution is found.\n",
         "links": []
     },
 
@@ -1248,12 +1289,13 @@ class ExamSchedulerApp:
         "content":
             "ABOUT EXAMTABLE MANAGER\n\n"
             "Examtable Manager is an automatic exam scheduling system\n"
-            "developed as part of the SE-302 Software Engineering course.\n\n"
-            "The system uses constraint-based logic to generate\n"
-            "conflict-free exam timetables.",
+            "developed for the SE-302 Software Engineering course.\n\n"
+            "The system generates conflict-free exam timetables\n"
+            "using constraint-based scheduling logic.\n",
         "links": []
     }
 }
+
 
 
         # Current page tracking
