@@ -554,7 +554,7 @@ class ExamSchedulerApp:
             if "timeout" in msg.lower():
                 messagebox.showwarning(
                     "Timeout",
-                    "⏱️ Schedule generation stopped.\nTime limit (10 seconds) exceeded."
+                    "⏱️ Schedule generation stopped.\nTime limit (25 seconds) exceeded."
                 )
 
             elif "stopped" in msg.lower() or "durdur" in msg.lower():
