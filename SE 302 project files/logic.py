@@ -287,7 +287,7 @@ class ScheduleSystem:
                 reasons.append("Some courses exceed classroom capacity")
 
             if not reasons:
-                reasons.append("High student conflict density")
+                reasons.append("Too many student conflicts. Not enough time slots to schedule exams.")
 
             return False, "No Solution Found.\nReasons:\n- " + "\n- ".join(reasons)
 
