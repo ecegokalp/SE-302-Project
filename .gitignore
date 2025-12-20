@@ -1,0 +1,15 @@
+﻿# PyInstaller
+dist/
+build/
+*.spec
+
+# SQLite databases
+*.db
+
+# Virtual environments
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc

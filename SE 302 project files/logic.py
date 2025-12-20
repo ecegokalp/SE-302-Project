@@ -4,6 +4,7 @@ import random
 from collections import defaultdict
 import data_access
 import os
+import sys
 from db import DB
 from models import Course, Classroom
 
@@ -13,7 +14,14 @@ from models import Course, Classroom
 class ScheduleSystem:
     def __init__(self):
         self.reset_data()
-        db_path = os.path.join(os.path.dirname(__file__), "examtable.db")
+        if getattr(sys, "frozen", False):
+            app_dir = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "ExamtableManager")
+        else:
+            app_dir = os.path.dirname(__file__)
+
+        os.makedirs(app_dir, exist_ok=True)
+        db_path = os.path.join(app_dir, "examtable.db")
+
         self.db = DB(db_path)
 
     def reset_data(self):
