@@ -193,13 +193,37 @@ class ExamSchedulerApp:
         pad_x = 5
         pad_y = 5
         
-        ttk.Button(db_btn_frame, text="💾 Save 1", width=btn_w, command=lambda: self.save_to_db_slot(1)).grid(row=0, column=0, padx=pad_x, pady=pad_y)
-        ttk.Button(db_btn_frame, text="📥 Load 1", width=btn_w, command=lambda: self.load_from_db_slot(1)).grid(row=0, column=1, padx=pad_x, pady=pad_y)
-        ttk.Button(db_btn_frame, text="💾 Save 2", width=btn_w, command=lambda: self.save_to_db_slot(2)).grid(row=1, column=0, padx=pad_x, pady=pad_y)
-        ttk.Button(db_btn_frame, text="📥 Load 2", width=btn_w, command=lambda: self.load_from_db_slot(2)).grid(row=1, column=1, padx=pad_x, pady=pad_y)
         
-        ttk.Button(db_btn_frame, text="📌 Comp 1", width=btn_w, command=lambda: self.compare_with_save(1)).grid(row=2, column=0, padx=pad_x, pady=pad_y)
-        ttk.Button(db_btn_frame, text="📌 Comp 2", width=btn_w, command=lambda: self.compare_with_save(2)).grid(row=2, column=1, padx=pad_x, pady=pad_y)
+        # Save 1 / Load 1
+        ttk.Button(db_btn_frame, text="💾 Save 1", width=btn_w,
+                command=lambda: self.save_to_db_slot(1)).grid(row=0, column=0, padx=pad_x, pady=pad_y)
+
+        ttk.Button(db_btn_frame, text="📥 Load 1", width=btn_w,
+                command=lambda: self.load_from_db_slot(1)).grid(row=0, column=1, padx=pad_x, pady=pad_y)
+
+        # -------- SEPARATOR --------
+        ttk.Separator(db_btn_frame, orient="horizontal").grid(
+            row=1, column=0, columnspan=2, sticky="ew", pady=8
+        )
+
+        # Save 2 / Load 2
+        ttk.Button(db_btn_frame, text="💾 Save 2", width=btn_w,
+                command=lambda: self.save_to_db_slot(2)).grid(row=2, column=0, padx=pad_x, pady=pad_y)
+
+        ttk.Button(db_btn_frame, text="📥 Load 2", width=btn_w,
+                command=lambda: self.load_from_db_slot(2)).grid(row=2, column=1, padx=pad_x, pady=pad_y)
+
+        # -------- SEPARATOR --------
+        ttk.Separator(db_btn_frame, orient="horizontal").grid(
+            row=3, column=0, columnspan=2, sticky="ew", pady=8
+        )
+
+        # Comp 1 / Comp 2
+        ttk.Button(db_btn_frame, text="📌 Comp 1", width=btn_w,
+                command=lambda: self.compare_with_save(1)).grid(row=4, column=0, padx=pad_x, pady=pad_y)
+
+        ttk.Button(db_btn_frame, text="📌 Comp 2", width=btn_w,
+                command=lambda: self.compare_with_save(2)).grid(row=4, column=1, padx=pad_x, pady=pad_y)
 
 
         # --- 2. Exam Calendar Settings ---
@@ -338,7 +362,7 @@ class ExamSchedulerApp:
     def imp_students(self): self.load_file(self.imp_students, self.system.load_all_students_regex)
 
     def load_file(self, func_ref, system_method):
-        path = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv"), ("Text Files", "*.txt"), ("All Files", "*.*")])
+        path = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
         if path:
             msg = system_method(path)
             if hasattr(func_ref, 'status_label'):
