@@ -239,7 +239,7 @@ class ScheduleSystem:
                     idx += 1
 
     # ---------------- SOLVER ----------------
-    def solve(self, time_limit_sec=10):
+    def solve(self, time_limit_sec=25):
         try:
             self.stop_event.clear()
             self.iteration_count = 0
