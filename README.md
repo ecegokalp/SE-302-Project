@@ -8,7 +8,12 @@ ExamTable Manager is a desktop application designed to automate the process of s
 * **Operating System:** Windows
 
 ## Features and Usage
-* **Data import:** Users are able to import .csv files that include information about classrooms and capacities, Attendance lists, Courses and Students in correct formatting. You can access sample files here.//TBA: DL LINK
+* **Data import:** Users are able to import `.csv` files that include information about classrooms and capacities, Attendance lists, Courses and Students in correct formatting. You can access sample files here.//TBA: DL LINK
+[Classrooms and Capacities List](docs/sampleData_AllClassroomsAndTheirCapacities.csv)
+[Attendance Lists](docs/sampleData_AllAttendanceLists.csv)
+[Course List](docs/sampleData_AllCourses.csv)
+[Students List](docs/sampleData_AllStudents.csv)
+
 * **Database actions:** Users are able to save their progress into a database and load from the database from specific slots. They can also compare currently loaded data with saved data to see differences between their files.
 * **Exam Period Adjustment:** Users can pick a start date for their examination period and specify how long the exam period should last. They can also customize how many slots should exist in a day and how long a slot should be, and remove slots they don’t need.
 * **Activity Log:** The program supplies the user with a report of all the actions they have executed.
@@ -36,17 +41,17 @@ ExamTable Manager is a desktop application designed to automate the process of s
 //TBA: SON HALINDE SSLER KOYULACAK
 
 ## File Structure
-* **Database:** The system stores data in an SQLite database file (examtable.db) located in the application directory. ////BURASI BI ABUK
+* **Database:** The system stores data in an SQLite database file (`examtable.db`) located in the application directory. ////BURASI BI ABUK
 * **Input Support:** The application supports importing data from .csv files that match specific patterns.
 
 ## Project Management
 //TRELLO
 
 ### Milestone 1 - Requirements
-You can access the requirements document here: /////
+You can access the requirements document [here](docs/Group-4_Requirements_Document.pdf)
 
 ### Milestone 2 - Design Document
-You can access the design document here: //////
+You can access the design document [here](docs/Group-4_Design_Document.pdf)
 
 ## Help & Support
-For additional support or information about the system, please contact the development team or refer to the help menu in the program. //?
+For additional support or information about the system, please contact the development team or refer to the help menu in the program.
