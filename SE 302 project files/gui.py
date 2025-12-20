@@ -307,8 +307,15 @@ class ExamSchedulerApp:
         log_inner = tk.Frame(log_frame, bg=self.colors["bg_white"])
         log_inner.pack(fill='both', expand=True, padx=10, pady=10)
 
-        self.txt_log = tk.Text(log_inner, height=15, bg="black", fg="#00ff00",
+        self.txt_log = tk.Text(log_inner, height=15, bg="black", fg="white",
                                font=('Consolas', 9), wrap='word', state='disabled', padx=8, pady=6)
+        self.txt_log.tag_configure("log_success", foreground="#ffffff")  # white
+        self.txt_log.tag_configure("log_error", foreground="#ff5252")    # red
+        self.txt_log.tag_configure("log_warning", foreground="#ffca28")  # yellow
+        self.txt_log.tag_configure("log_info", foreground="white")       # default
+
+
+
         log_scroll = ttk.Scrollbar(log_inner, orient='vertical', command=self.txt_log.yview)
         self.txt_log['yscrollcommand'] = log_scroll.set
         log_scroll.pack(side='right', fill='y')
@@ -363,22 +370,42 @@ class ExamSchedulerApp:
 
     def load_file(self, func_ref, system_method):
         path = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
-        if path:
-            msg = system_method(path)
-            if hasattr(func_ref, 'status_label'):
-                fname = path.split('/')[-1]
-                if "SUCCESS" in msg or "BAŞARILI" in msg:
-                    color, txt = "#27ae60", f"Loaded ({fname})"
-                else:
-                    color, txt = "#e74c3c", "Error / Empty"
-                func_ref.status_label.config(text=txt, fg=color, font=('Segoe UI', 9, 'bold'))
-            self.lbl_log.config(text=msg)
-            # Append to activity log
-            try:
-                fname = path.split('/')[-1]
-            except:
-                fname = path
-            self.append_log(f"Import {fname}: {msg}")
+        if not path:
+            return
+
+        msg = system_method(path)
+        fname = path.split('/')[-1]
+
+        # Status label (yanındaki yazı)
+        if hasattr(func_ref, 'status_label'):
+            if msg.startswith("SUCCESS"):
+                func_ref.status_label.config(
+                    text=f"Loaded ({fname})",
+                    fg="#27ae60",
+                    font=('Segoe UI', 9, 'bold')
+                )
+            else:
+                func_ref.status_label.config(
+                    text="Error / Empty",
+                    fg="#e74c3c",
+                    font=('Segoe UI', 9, 'bold')
+                )
+
+        # Log seviyesi
+        log_level = "info"
+
+        if msg.startswith("SUCCESS"):
+            # SADECE SUCCESS: 0 ise kırmızı
+            if re.search(r"SUCCESS:\s*0\b", msg):
+                log_level = "error"
+            else:
+                log_level = "success"
+        elif "ERROR" in msg or "HATA" in msg:
+            log_level = "error"
+
+        self.append_log(f"Import {fname}: {msg}", log_level)
+
+
 
     # --- DB Methods from Code 2 ---
     def save_to_db(self):
@@ -1396,21 +1423,25 @@ class ExamSchedulerApp:
         # Load initial page
         load_page("index")
 
-    def append_log(self, text):
-        """Append a timestamped entry to the activity log (read-only Text widget)."""
-        try:
+    def append_log(self, text, level="info"):
             ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             entry = f"[{ts}] {text}\n"
+
             self.txt_log.config(state='normal')
-            self.txt_log.insert('end', entry)
+
+            if level == "success":
+                tag = "log_success"
+            elif level == "error":
+                tag = "log_error"
+            elif level == "warning":
+                tag = "log_warning"
+            else:
+                tag = "log_info"
+
+            self.txt_log.insert('end', entry, tag)
             self.txt_log.see('end')
             self.txt_log.config(state='disabled')
-        except Exception:
-            # If log widget isn't available, fallback to status label
-            try:
-                self.lbl_log.config(text=text)
-            except Exception:
-                pass
+
 
     def _show_student_schedule(self, sid, parent_frame):
         """Display a single student's schedule in the parent frame."""
