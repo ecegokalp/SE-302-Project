@@ -180,10 +180,10 @@ class ExamSchedulerApp:
         db_col.pack(side='right', fill='both', padx=(0, 10), anchor='n')
         
         # Files Column (Anchor w to keep left aligned)
-        self.create_file_row(files_col, "Classrooms & Caps:", self.imp_rooms)
-        self.create_file_row(files_col, "Attendance Lists:", self.imp_attendance)
-        self.create_file_row(files_col, "All Courses:", self.imp_courses)
-        self.create_file_row(files_col, "All Students:", self.imp_students)
+        self.create_file_row(files_col, "Classrooms & Caps:", self.imp_rooms, "CLASSROOMS")
+        self.create_file_row(files_col, "Attendance Lists:", self.imp_attendance, "ATTENDANCE")
+        self.create_file_row(files_col, "All Courses:", self.imp_courses, "COURSES")
+        self.create_file_row(files_col, "All Students:", self.imp_students, "STUDENTS")
 
         # DB Column Actions
         tk.Label(db_col, text="Database Actions", bg=self.colors["bg_white"], fg="#90a4ae", font=('Segoe UI', 8, 'bold')).pack(pady=(0,5))
@@ -358,7 +358,7 @@ class ExamSchedulerApp:
             messagebox.showwarning("Warning", "Select a slot to remove.")
             self.append_log("Remove slot attempted without selection")
 
-    def create_file_row(self, parent, label_text, command_func):
+    def create_file_row(self, parent, label_text, command_func, data_type="DATA"):
         f = tk.Frame(parent, bg=self.colors["bg_white"])
         f.pack(fill='x', pady=2)
         tk.Label(f, text=label_text, width=20, anchor='w', bg=self.colors["bg_white"]).pack(side='left')
@@ -366,34 +366,70 @@ class ExamSchedulerApp:
         lbl_status = tk.Label(f, text="Not Selected", fg="#95a5a6", bg=self.colors["bg_white"], font=('Segoe UI', 9, 'italic'))
         lbl_status.pack(side='left', padx=10)
         command_func.__func__.status_label = lbl_status
+        command_func.__func__.data_type = data_type
 
-    def imp_rooms(self): self.load_file(self.imp_rooms, self.system.load_classrooms_regex)
-    def imp_courses(self): self.load_file(self.imp_courses, self.system.load_courses_regex)
-    def imp_attendance(self): self.load_file(self.imp_attendance, self.system.load_attendance_regex)
-    def imp_students(self): self.load_file(self.imp_students, self.system.load_all_students_regex)
+    def imp_rooms(self): self.load_file(self.imp_rooms, self.system.load_classrooms_regex, "CLASSROOMS")
+    def imp_courses(self): self.load_file(self.imp_courses, self.system.load_courses_regex, "COURSES")
+    def imp_attendance(self): self.load_file(self.imp_attendance, self.system.load_attendance_regex, "ATTENDANCE")
+    def imp_students(self): self.load_file(self.imp_students, self.system.load_all_students_regex, "STUDENTS")
 
-    def load_file(self, func_ref, system_method):
+    def load_file(self, func_ref, system_method, data_type="DATA"):
         path = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
         if not path:
             return
 
-        msg = system_method(path)
-        fname = path.split('/')[-1]
+        fname = path.split('/')[-1].lower()
+        fname_display = path.split('/')[-1]
+        
+        # Get data type from function reference if available
+        if hasattr(func_ref, 'data_type'):
+            data_type = func_ref.data_type
 
-        # Status label (yanındaki yazı)
-        if hasattr(func_ref, 'status_label'):
-            if msg.startswith("SUCCESS"):
+        # Validate filename matches expected button type
+        filename_mismatches = {
+            "CLASSROOMS": ["student", "attendance", "course"],
+            "ATTENDANCE": ["classroom", "allstudent", "allcourse"],
+            "COURSES": ["classroom", "attendance", "allstudent"],
+            "STUDENTS": ["classroom", "attendance", "allcourse"]
+        }
+        
+        # Check if filename suggests wrong file type
+        wrong_file_detected = False
+        if data_type in filename_mismatches:
+            for wrong_keyword in filename_mismatches[data_type]:
+                if wrong_keyword in fname:
+                    wrong_file_detected = True
+                    break
+        
+        # If wrong file detected, don't load and mark as FAILED
+        if wrong_file_detected:
+            msg = f"FAILED - Wrong file type detected. Expected {data_type} file."
+            log_level = "error"
+            
+            # Update status label to show error
+            if hasattr(func_ref, 'status_label'):
                 func_ref.status_label.config(
-                    text=f"Loaded ({fname})",
-                    fg="#27ae60",
-                    font=('Segoe UI', 9, 'bold')
-                )
-            else:
-                func_ref.status_label.config(
-                    text="Error / Empty",
+                    text="Wrong File Type",
                     fg="#e74c3c",
                     font=('Segoe UI', 9, 'bold')
                 )
+            
+            # Log the error without loading
+            self.append_log(f"Import {fname_display} [{data_type}]: {msg}", log_level)
+            return  # Don't proceed with loading
+        
+        # If file looks correct, proceed with loading
+        msg = system_method(path)
+
+        # Check if message contains errors even if it starts with SUCCESS
+        has_errors = any(keyword in msg for keyword in ["ERROR", "HATA", "FAILED", "No Solution Found"])
+        
+        # Check if SUCCESS: 0 (no data loaded)
+        has_zero_count = re.search(r"SUCCESS:\s*0\b", msg)
+        
+        # If message starts with SUCCESS but contains errors or zero count, change to FAILED
+        if msg.startswith("SUCCESS") and (has_errors or has_zero_count):
+            msg = msg.replace("SUCCESS", "FAILED", 1)
 
         # Log seviyesi
         log_level = "info"
@@ -404,10 +440,25 @@ class ExamSchedulerApp:
                 log_level = "error"
             else:
                 log_level = "success"
-        elif "ERROR" in msg or "HATA" in msg:
+        elif "ERROR" in msg or "HATA" in msg or "FAILED" in msg:
             log_level = "error"
 
-        self.append_log(f"Import {fname}: {msg}", log_level)
+        # Status label (yanındaki yazı)
+        if hasattr(func_ref, 'status_label'):
+            if msg.startswith("SUCCESS"):
+                func_ref.status_label.config(
+                    text=f"Loaded ({fname_display})",
+                    fg="#27ae60",
+                    font=('Segoe UI', 9, 'bold')
+                )
+            else:
+                func_ref.status_label.config(
+                    text="Error / Empty",
+                    fg="#e74c3c",
+                    font=('Segoe UI', 9, 'bold')
+                )
+
+        self.append_log(f"Import {fname_display} [{data_type}]: {msg}", log_level)
 
 
 
