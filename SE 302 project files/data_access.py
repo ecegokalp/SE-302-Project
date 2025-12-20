@@ -22,8 +22,9 @@ def read_courses_from_file(filepath):
     """
     Reads a simple courses file containing one course code per line optionally
     followed by a separator and duration in minutes. Example lines:
-      CourseCode_01
-      CourseCode_02;90
+      SE 302
+      MATH 101;90
+      CS 210 120
     Returns a list of Course objects with empty student lists and optional durations.
     """
     courses = []
@@ -40,25 +41,32 @@ def read_courses_from_file(filepath):
     for line in lines:
         line = line.strip()
         if not line: continue
-        # Accept separators ; , or whitespace
-        parts = re.split(r'[;,\s]+', line)
-        code = next((p for p in parts if 'CourseCode_' in p), None)
+        
+        # Skip common header patterns
+        if line.upper().startswith('ALL OF THE') or line.startswith('#'):
+            continue
+        
+        # Check if there's a semicolon-separated duration
+        duration = None
+        code = line
+        
+        if ';' in line:
+            parts = line.split(';', 1)
+            code = parts[0].strip()
+            if len(parts) > 1 and parts[1].strip().isdigit():
+                duration = int(parts[1].strip())
+        
         if code:
-            # try to find a numeric duration
-            duration = None
-            for p in parts:
-                if p.isdigit():
-                    duration = int(p)
-                    break
-            courses.append(Course(code.strip(), [], duration))
+            courses.append(Course(code, [], duration))
     return courses
 
 
 def read_attendance_from_file(filepath):
     """
-    Reads attendance lists where a course code line (CourseCode_XX) is followed by
+    Reads attendance lists where a course code line is followed by
     one or more lines containing student ids like ['Std_ID_001', 'Std_ID_002'] or
-    plain lists. Returns Course objects populated with student lists.
+    plain lists. Course codes can be in any format (e.g., "SE 302", "MATH 101", "CourseCode_01").
+    Returns Course objects populated with student lists.
     """
     courses = []
     content = ""
@@ -79,31 +87,40 @@ def read_attendance_from_file(filepath):
         line = line.strip()
         if not line: continue
 
-        # Ders kodunu bul (Örn: CourseCode_01 or CourseCode_01;120)
-        if "CourseCode_" in line:
-            parts = re.split(r'[;:,\s]+', line)
-            current_code = None
+        # If line contains student IDs, it's a student list
+        if "Std_ID_" in line:
+            if current_code:
+                students_in_line = re.findall(r"(Std_ID_\d+)", line)
+                if students_in_line:
+                    existing = next((c for c in courses if c.code == current_code), None)
+                    if existing:
+                        existing.students.extend(students_in_line)
+                        existing.students = list(set(existing.students))
+                        # Update duration if specified
+                        if current_duration is not None:
+                            existing.duration = current_duration
+                    else:
+                        courses.append(Course(current_code, students_in_line, current_duration))
+        else:
+            # This line doesn't contain student IDs, so it's a course code line
+            # Skip common header patterns
+            if line.upper().startswith('ALL OF THE') or line.startswith('#'):
+                continue
+            
+            # Parse course code and optional duration
             current_duration = None
-            for p in parts:
-                if "CourseCode_" in p:
-                    current_code = p.strip()
-                elif p.isdigit():
-                    current_duration = int(p)
-            continue
-
-        # Öğrencileri bul (Std_ID_01)
-        if current_code and "Std_ID_" in line:
-            students_in_line = re.findall(r"(Std_ID_\d+)", line)
-            if students_in_line:
-                existing = next((c for c in courses if c.code == current_code), None)
-                if existing:
-                    existing.students.extend(students_in_line)
-                    existing.students = list(set(existing.students))
-                    # Update duration if specified
-                    if current_duration is not None:
-                        existing.duration = current_duration
-                else:
-                    courses.append(Course(current_code, students_in_line, current_duration))
+            current_code = line
+            
+            # Check if there's a semicolon or colon-separated duration
+            if ';' in line or ':' in line:
+                # Try semicolon first
+                sep = ';' if ';' in line else ':'
+                parts = line.split(sep, 1)
+                current_code = parts[0].strip()
+                if len(parts) > 1 and parts[1].strip().isdigit():
+                    current_duration = int(parts[1].strip())
+            
+            current_code = current_code.strip()
 
     return courses
 
