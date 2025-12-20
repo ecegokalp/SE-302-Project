@@ -3,6 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 import csv
 import re
+import time
 from datetime import datetime, timedelta
 
 # PDF Export Imports (Code 2'den alındı)
@@ -114,6 +115,9 @@ class ExamSchedulerApp:
 
         self.btn_stop = ttk.Button(bottom_area, text="STOP", command=self.stop_process, state='disabled')
         self.btn_stop.pack(side='left', padx=8, ipadx=8, ipady=6)
+
+        self.btn_find_min = ttk.Button(bottom_area, text="FIND MIN SLOTS", style="Big.Accent.TButton", command=self.find_minimum_slots)
+        self.btn_find_min.pack(side='left', padx=8, ipadx=14, ipady=6)
 
         self.lbl_log = tk.Label(self.tab_config, text="", bg=self.colors["bg_white"], fg=self.colors["primary"])
         self.lbl_log.pack(side='bottom', pady=(0, 5))
@@ -483,6 +487,124 @@ class ExamSchedulerApp:
         self.lbl_log.config(text="Stopping...")
         self.lbl_log.config(fg="red")
         self.append_log("Stop requested by user")
+
+    def find_minimum_slots(self):
+        """Find the minimum number of slots needed to generate a schedule"""
+        if not self.system.classrooms or not self.system.courses:
+            return messagebox.showerror("Missing Data", "Please upload required files: Classroom List and Attendance List.")
+        
+        try:
+            # Validate inputs
+            if HAS_CALENDAR: 
+                self.start_date = self.ent_date.get_date()
+            else: 
+                self.start_date = datetime.strptime(self.ent_date.get(), "%Y-%m-%d").date()
+
+            raw_slots = list(self.lst_slots.get(0, tk.END))
+            if not raw_slots: 
+                return messagebox.showerror("Error", "Add at least one time slot.")
+
+            def parse_slot(s):
+                start_time_str = s.split('-')[0].strip()
+                return datetime.strptime(start_time_str, "%H:%M")
+
+            self.slot_times = sorted(raw_slots, key=parse_slot)
+
+            # Calculate slot duration
+            try:
+                parts = self.slot_times[0].split('-')
+                start = datetime.strptime(parts[0].strip(), "%H:%M")
+                end = datetime.strptime(parts[1].strip(), "%H:%M")
+                slot_duration_minutes = int((end - start).total_seconds() / 60)
+            except:
+                slot_duration_minutes = 60
+
+            try:
+                days_val = int(self.ent_days.get())
+            except:
+                days_val = 7
+
+            # Get initial total slots (days * slots_per_day)
+            slots_per_day = len(self.slot_times)
+            initial_total_slots = days_val * slots_per_day
+
+            self.append_log("Finding minimum slots needed...")
+            self.lbl_log.config(text="Finding minimum slots...")
+            self.btn_start.config(state='disabled')
+            self.btn_stop.config(state='disabled')
+            self.btn_find_min.config(state='disabled')
+            
+            # Start the process in a thread
+            threading.Thread(target=self.run_find_min_slots, args=(initial_total_slots, slots_per_day, slot_duration_minutes), daemon=True).start()
+            
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            self.append_log(f"Error in find_minimum_slots: {str(e)}")
+
+    def run_find_min_slots(self, initial_total_slots, slots_per_day, slot_duration_minutes):
+        """Thread function to iteratively find minimum slots"""
+        current_total_slots = initial_total_slots
+        found = False
+        attempt = 0
+        
+        while not found:
+            attempt += 1
+            # Calculate days needed for current total slots
+            current_days = (current_total_slots + slots_per_day - 1) // slots_per_day  # Ceiling division
+            
+            # Update system parameters
+            self.system.num_days = current_days
+            self.system.slots_per_day = slots_per_day
+            self.system.slot_duration_minutes = slot_duration_minutes
+            
+            # Log the attempt
+            log_msg = f"Attempt {attempt}: Trying {current_total_slots} total slots ({current_days} days × {slots_per_day} slots/day)"
+            self.root.after(0, lambda msg=log_msg: self.append_log(msg))
+            self.root.after(0, lambda: self.lbl_log.config(text=f"Testing {current_total_slots} slots..."))
+            
+            # Try to solve with current configuration
+            success, msg = self.system.solve(time_limit_sec=5)
+            
+            if success:
+                found = True
+                result_msg = f"✓ RECOMMENDED SLOTS: {current_total_slots} ({current_days} days × {slots_per_day} slots/day)"
+                self.root.after(0, lambda: self.finish_find_min_slots(True, result_msg, current_total_slots, current_days))
+                return
+            
+            # Increase slots by 20
+            current_total_slots += 20
+            
+            # Safety limit to prevent infinite loop
+            if current_total_slots > 500:
+                result_msg = "Could not find feasible schedule within reasonable limits (max 500 slots tested)"
+                self.root.after(0, lambda: self.finish_find_min_slots(False, result_msg, 0, 0))
+                return
+            
+            # Wait 0.5 seconds before next attempt
+            time.sleep(0.5)
+
+    def finish_find_min_slots(self, success, msg, total_slots, days):
+        """Callback when find_minimum_slots completes"""
+        self.lbl_log.config(text=msg)
+        self.btn_start.config(state='normal')
+        self.btn_stop.config(state='normal')
+        self.btn_find_min.config(state='normal')
+        
+        if success:
+            self.append_log(msg)
+            messagebox.showinfo("Minimum Slots Found", 
+                               f"Recommended configuration:\n\n"
+                               f"Total Slots: {total_slots}\n"
+                               f"Days: {days}\n"
+                               f"Slots per day: {self.system.slots_per_day}\n\n"
+                               f"A schedule has been successfully generated with this configuration!")
+            
+            # Show the generated schedule
+            self.notebook.select(self.tab_schedule)
+            self.refresh_table()
+        else:
+            self.append_log(f"Find minimum slots failed: {msg}")
+            messagebox.showerror("Failed", msg)
 
     def run_logic(self):
         success, msg = self.system.solve()
