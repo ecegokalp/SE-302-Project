@@ -338,7 +338,7 @@ class ExamSchedulerApp:
     def imp_students(self): self.load_file(self.imp_students, self.system.load_all_students_regex)
 
     def load_file(self, func_ref, system_method):
-        path = filedialog.askopenfilename(filetypes=[("All Files", "*.*"), ("CSV", "*.csv"), ("TXT", "*.txt")])
+        path = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv"), ("Text Files", "*.txt"), ("All Files", "*.*")])
         if path:
             msg = system_method(path)
             if hasattr(func_ref, 'status_label'):
