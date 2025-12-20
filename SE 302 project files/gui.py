@@ -21,7 +21,7 @@ from logic import ScheduleSystem
 class ExamSchedulerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Examtable Manager - Auto & Remove Only")
+        self.root.title("Examtable Manager")
         self.root.geometry("1280x900")
 
         self.colors = {
@@ -530,30 +530,49 @@ class ExamSchedulerApp:
         ttk.Button(top_bar, text="Export CSV", command=self.export_to_csv).pack(side='right')
         ttk.Button(top_bar, text="Export PDF", command=self.export_to_pdf).pack(side='right', padx=(10, 0))
 
-        # Center the table by using a 3-column grid (left spacer, center content, right spacer)
-        tree_outer = tk.Frame(self.tab_schedule, bg=self.colors["bg_white"])
-        tree_outer.pack(fill='both', expand=True, padx=20, pady=(0, 20))
-        tree_outer.grid_rowconfigure(0, weight=1)
-        tree_outer.grid_columnconfigure(0, weight=1)
-        tree_outer.grid_columnconfigure(1, weight=3)
-        tree_outer.grid_columnconfigure(2, weight=1)
+        # Main container - each view gets completely isolated frames
+        self.views_container = tk.Frame(self.tab_schedule, bg=self.colors["bg_white"])
+        self.views_container.pack(fill='both', expand=True, padx=20, pady=(0, 20))
+        self.views_container.grid_rowconfigure(0, weight=1)
+        self.views_container.grid_columnconfigure(0, weight=1)
 
-        center_frame = tk.Frame(tree_outer, bg=self.colors["bg_white"] )
-        center_frame.grid(row=0, column=1, sticky='nsew')
+        # 1. General Schedule View (tree-based)
+        self.general_frame = tk.Frame(self.views_container, bg=self.colors["bg_white"])
+        self.general_frame.grid(row=0, column=0, sticky='nsew')
+        scrolly_gen = ttk.Scrollbar(self.general_frame, orient="vertical")
+        scrollx_gen = ttk.Scrollbar(self.general_frame, orient="horizontal")
+        self.tree_general = ttk.Treeview(self.general_frame, show='headings', yscrollcommand=scrolly_gen.set, xscrollcommand=scrollx_gen.set)
+        scrolly_gen.config(command=self.tree_general.yview)
+        scrollx_gen.config(command=self.tree_general.xview)
+        scrolly_gen.pack(side="right", fill="y")
+        scrollx_gen.pack(side="bottom", fill="x")
+        self.tree_general.pack(side="left", fill="both", expand=True)
+        self.set_columns_general_tree(self.tree_general)
 
-        scrolly = ttk.Scrollbar(center_frame, orient="vertical")
-        scrollx = ttk.Scrollbar(center_frame, orient="horizontal")
-        self.tree = ttk.Treeview(center_frame, show='headings', yscrollcommand=scrolly.set, xscrollcommand=scrollx.set)
-        scrolly.config(command=self.tree.yview)
-        scrollx.config(command=self.tree.xview)
-        scrolly.pack(side="right", fill="y")
-        scrollx.pack(side="bottom", fill="x")
-        self.tree.pack(side="left", fill="y")
-        # keep references for switching views
-        self.schedule_center = center_frame
-        self.tree_scrolly = scrolly
-        self.tree_scrollx = scrollx
-        self.set_columns_daily()
+        # 2. Classroom Based View (tree-based)
+        self.classroom_frame = tk.Frame(self.views_container, bg=self.colors["bg_white"])
+        self.classroom_frame.grid(row=0, column=0, sticky='nsew')
+        scrolly_cls = ttk.Scrollbar(self.classroom_frame, orient="vertical")
+        scrollx_cls = ttk.Scrollbar(self.classroom_frame, orient="horizontal")
+        self.tree_classroom = ttk.Treeview(self.classroom_frame, show='headings', yscrollcommand=scrolly_cls.set, xscrollcommand=scrollx_cls.set)
+        scrolly_cls.config(command=self.tree_classroom.yview)
+        scrollx_cls.config(command=self.tree_classroom.xview)
+        scrolly_cls.pack(side="right", fill="y")
+        scrollx_cls.pack(side="bottom", fill="x")
+        self.tree_classroom.pack(side="left", fill="both", expand=True)
+        self.set_columns_classroom_tree(self.tree_classroom)
+
+        # 3. Daily Plan View (custom frame)
+        self.daily_frame = tk.Frame(self.views_container, bg=self.colors["bg_white"])
+        self.daily_frame.grid(row=0, column=0, sticky='nsew')
+
+        # 4. Student Based View (custom frame)
+        self.student_view_frame = tk.Frame(self.views_container, bg=self.colors["bg_white"])
+        self.student_view_frame.grid(row=0, column=0, sticky='nsew')
+
+        # 5. Exam Attendance View (custom frame)
+        self.attendance_view_frame = tk.Frame(self.views_container, bg=self.colors["bg_white"])
+        self.attendance_view_frame.grid(row=0, column=0, sticky='nsew')
 
     def get_real_datetime(self, d, s, course_code=None):
         date = self.start_date + timedelta(days=d)
@@ -597,6 +616,25 @@ class ExamSchedulerApp:
         days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         return f"{date.strftime('%Y-%m-%d')} ({days[date.weekday()]})"
 
+    def set_columns_general_tree(self, tree):
+        cols = ["Course", "Time", "Count", "Classroom", "Capacity"]
+        tree['columns'] = cols
+        for c in cols: tree.heading(c, text=c)
+        tree.column("Course", width=200, anchor='center')
+        tree.column("Time", width=300)
+        tree.column("Count", width=100, anchor='center')
+        tree.column("Classroom", width=200)
+        tree.column("Capacity", width=120, anchor='center')
+
+    def set_columns_classroom_tree(self, tree):
+        cols = ["Classroom", "Time", "Course", "Status"]
+        tree['columns'] = cols
+        for c in cols: tree.heading(c, text=c)
+        tree.column("Classroom", width=150, anchor='center')
+        tree.column("Time", width=300, anchor='w')
+        tree.column("Course", width=200, anchor='center')
+        tree.column("Status", width=120, anchor='center')
+
     def set_columns_general(self):
         cols = ["Course", "Time", "Count", "Classroom", "Capacity"]
         self.tree['columns'] = cols
@@ -637,49 +675,64 @@ class ExamSchedulerApp:
 
     def refresh_table(self, event=None):
         mode = self.view_var.get()
-        # Clean up any per-view widgets from previous view (search frames, day/student frames)
-        for attr in ('student_frame', 'student_search_frame', 'day_frame', 'day_search_frame', 'attendance_frame', 'attendance_search_frame'):
-            if hasattr(self, attr) and getattr(self, attr):
-                try:
-                    getattr(self, attr).destroy()
-                    setattr(self, attr, None)
-                except Exception:
-                    try:
-                        setattr(self, attr, None)
-                    except Exception:
-                        pass
-        # Ensure tree is visible by default
-        if hasattr(self, 'tree') and not self.tree.winfo_ismapped():
-            try:
-                self.tree_scrolly.pack(side="right", fill="y")
-                self.tree_scrollx.pack(side="bottom", fill="x")
-                self.tree.pack(side="left", fill="both", expand=True)
-            except Exception:
-                pass
-
-        for i in self.tree.get_children(): self.tree.delete(i)
+        
+        # Hide all view frames first
+        self.general_frame.grid_remove()
+        self.classroom_frame.grid_remove()
+        self.daily_frame.grid_remove()
+        self.student_view_frame.grid_remove()
+        self.attendance_view_frame.grid_remove()
+        
+        # Clear all frames completely
+        for widget in self.daily_frame.winfo_children():
+            widget.destroy()
+        for widget in self.student_view_frame.winfo_children():
+            widget.destroy()
+        for widget in self.attendance_view_frame.winfo_children():
+            widget.destroy()
+        
+        # Clear tree views
+        for item in self.tree_general.get_children():
+            self.tree_general.delete(item)
+        for item in self.tree_classroom.get_children():
+            self.tree_classroom.delete(item)
+        
         self.full_data = []
+        
         if mode == "General Schedule":
-            self.set_columns_general()
+            # Populate general schedule tree
             for c_code, (d, s, rooms) in self.system.assignments.items():
                 c = next((x for x in self.system.courses if x.code == c_code), None)
                 st_cnt = len(c.students) if c else 0
                 r_names = ", ".join([r.code for r in rooms])
                 cap = f"{st_cnt} / {sum(r.capacity for r in rooms)}"
                 self.full_data.append((c_code, self.get_real_datetime(d, s, c_code), st_cnt, r_names, cap))
+            
+            for row in self.full_data:
+                self.tree_general.insert('', 'end', values=row)
+            self.general_frame.grid()
+            
+        elif mode == "Classroom Based":
+            # Populate classroom based tree
+            for c_code, (d, s, rooms) in self.system.assignments.items():
+                for r in rooms:
+                    self.full_data.append((r.code, self.get_real_datetime(d, s, c_code), c_code, "OCCUPIED"))
+            self.full_data.sort()
+            
+            for row in self.full_data:
+                self.tree_classroom.insert('', 'end', values=row)
+            self.classroom_frame.grid()
+            
         elif mode == "Daily Plan":
-            # Build per-day selectable view: date picker + table for chosen day
-            # collect assignments per date string
+            # Build daily plan view with date picker
             from collections import defaultdict
             day_groups = defaultdict(list)
             for c_code, (d, s, rooms) in self.system.assignments.items():
                 date = (self.start_date + timedelta(days=d)).strftime('%Y-%m-%d')
                 c = next((x for x in self.system.courses if x.code == c_code), None)
                 
-                # Check if course has explicit duration from file
                 if c and s < len(self.slot_times):
                     if hasattr(c, '_explicit_duration') and c._explicit_duration:
-                        # Use course's explicit duration
                         start_time_str = self.slot_times[s].split('-')[0].strip()
                         try:
                             start_time = datetime.strptime(start_time_str, "%H:%M")
@@ -687,7 +740,6 @@ class ExamSchedulerApp:
                             end_time_str = end_time.strftime("%H:%M")
                             time_str = f"{start_time_str}-{end_time_str}"
                         except:
-                            # Fallback to slot-based calculation
                             slots_needed = self.system.get_slots_needed(c)
                             end_slot = s + slots_needed - 1
                             if end_slot < len(self.slot_times):
@@ -696,7 +748,6 @@ class ExamSchedulerApp:
                             else:
                                 time_str = self.slot_times[s]
                     else:
-                        # No explicit duration - use slot time directly
                         time_str = self.slot_times[s]
                 else:
                     time_str = self.slot_times[s] if s < len(self.slot_times) else '??'
@@ -704,27 +755,21 @@ class ExamSchedulerApp:
                 st_cnt = len(c.students) if c else 0
                 r_names = ", ".join([r.code for r in rooms])
                 day_groups[date].append((time_str, c_code, r_names, st_cnt))
-            # store groups for later export/use
+            
             self.day_groups = {k: sorted(v, key=lambda x: x[0]) for k, v in day_groups.items()}
-
-            # hide main tree
-            try:
-                self.tree.pack_forget()
-                self.tree_scrolly.pack_forget()
-                self.tree_scrollx.pack_forget()
-            except Exception:
-                pass
-
-            # create date picker search in center (per-view)
-            self.day_search_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
-            self.day_search_frame.pack(fill='x', padx=6, pady=(6,4))
-            tk.Label(self.day_search_frame, text="Select Date:", bg=self.colors["bg_white"]).pack(side='left')
+            
+            # Build daily plan UI
+            search_frame = tk.Frame(self.daily_frame, bg=self.colors["bg_white"])
+            search_frame.pack(fill='x', padx=6, pady=(6,4))
+            tk.Label(search_frame, text="Select Date:", bg=self.colors["bg_white"]).pack(side='left')
+            
             if HAS_CALENDAR:
-                dp = DateEntry(self.day_search_frame, width=12, background=self.colors["primary"], foreground='white', date_pattern='yyyy-mm-dd')
+                dp = DateEntry(search_frame, width=12, background=self.colors["primary"], foreground='white', date_pattern='yyyy-mm-dd')
             else:
-                dp = ttk.Entry(self.day_search_frame, width=12)
+                dp = ttk.Entry(search_frame, width=12)
                 dp.insert(0, self.start_date.strftime('%Y-%m-%d'))
             dp.pack(side='left', padx=(6,4))
+            
             def _do_pick(event=None):
                 try:
                     sel = dp.get()
@@ -736,13 +781,13 @@ class ExamSchedulerApp:
                 if sel not in self.day_groups:
                     messagebox.showwarning("No Data", f"No schedule available for {sel}.")
                     return
-                self._show_day_schedule(sel)
-            pick_btn = ttk.Button(self.day_search_frame, text="Search", command=_do_pick)
+                self._show_day_schedule(sel, self.daily_frame)
+            
+            pick_btn = ttk.Button(search_frame, text="Search", command=_do_pick)
             pick_btn.pack(side='left', padx=(4,0))
             if HAS_CALENDAR:
                 dp.bind('<Return>', _do_pick)
-
-            # show first available day by default
+            
             default_day = next(iter(self.day_groups.keys()), None)
             if default_day:
                 try:
@@ -752,15 +797,15 @@ class ExamSchedulerApp:
                         dp.delete(0, 'end'); dp.insert(0, default_day)
                 except Exception:
                     pass
-                self._show_day_schedule(default_day)
+                self._show_day_schedule(default_day, self.daily_frame)
             else:
-                # show message inside a dedicated day_frame so it can be destroyed cleanly
-                self.day_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
-                self.day_frame.pack(fill='both', expand=True)
-                lbl = tk.Label(self.day_frame, text="No schedule data available.", bg=self.colors["bg_white"], fg=self.colors["text_body"])
+                lbl = tk.Label(self.daily_frame, text="No schedule data available.", bg=self.colors["bg_white"], fg=self.colors["text_body"])
                 lbl.pack(pady=20)
+            
+            self.daily_frame.grid()
+            
         elif mode == "Student Based":
-            # Build a searchable single-student view: show one student at a time
+            # Build student based view
             temp_data = []
             for (sid, c_code), r_code in self.system.student_room_map.items():
                 if c_code in self.system.assignments:
@@ -768,30 +813,23 @@ class ExamSchedulerApp:
                     temp_data.append((sid, c_code, self.get_real_datetime(d, s, c_code), r_code))
             temp_data.sort(key=lambda x: (x[0], x[2]))
             self.full_data = temp_data
-
-            # hide main tree
-            try:
-                self.tree.pack_forget()
-                self.tree_scrolly.pack_forget()
-                self.tree_scrollx.pack_forget()
-            except Exception:
-                pass
-
-            # prepare student groups
+            
             from collections import defaultdict
             groups = defaultdict(list)
             for sid, c_code, time_str, r_code in temp_data:
                 groups[sid].append((c_code, time_str, r_code))
             self.student_groups = groups
             self.student_list_sorted = sorted(groups.keys())
-
-            # create search frame and result area in center (per-view)
-            self.student_search_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
-            self.student_search_frame.pack(fill='x', padx=6, pady=(6,4))
-            tk.Label(self.student_search_frame, text="Student ID:", bg=self.colors["bg_white"]).pack(side='left')
+            
+            # Build student search UI
+            search_frame = tk.Frame(self.student_view_frame, bg=self.colors["bg_white"])
+            search_frame.pack(fill='x', padx=6, pady=(6,4))
+            tk.Label(search_frame, text="Student ID:", bg=self.colors["bg_white"]).pack(side='left')
+            
             self.search_var = tk.StringVar()
-            search_entry = ttk.Entry(self.student_search_frame, textvariable=self.search_var, width=20)
+            search_entry = ttk.Combobox(search_frame, textvariable=self.search_var, width=20, values=self.student_list_sorted)
             search_entry.pack(side='left', padx=(6,4))
+            
             def _do_search(event=None):
                 sid = self.search_var.get().strip()
                 if not sid and self.student_list_sorted:
@@ -799,48 +837,33 @@ class ExamSchedulerApp:
                 if sid not in self.student_groups:
                     messagebox.showwarning("Not found", f"Student ID '{sid}' not found.")
                     return
-                self._show_student_schedule(sid)
-            search_btn = ttk.Button(self.student_search_frame, text="Search", command=_do_search)
+                self._show_student_schedule(sid, self.student_view_frame)
+            
+            search_btn = ttk.Button(search_frame, text="Search", command=_do_search)
             search_btn.pack(side='left', padx=(4,0))
             search_entry.bind('<Return>', _do_search)
-
-            # show first student by default (if any)
+            search_entry.bind('<<ComboboxSelected>>', _do_search)
+            
             default_sid = self.student_list_sorted[0] if self.student_list_sorted else None
             if default_sid:
                 self.search_var.set(default_sid)
-                self._show_student_schedule(default_sid)
+                self._show_student_schedule(default_sid, self.student_view_frame)
             else:
-                # show message inside a dedicated student_frame so it can be destroyed cleanly
-                self.student_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
-                self.student_frame.pack(fill='both', expand=True)
-                lbl = tk.Label(self.student_frame, text="No student assignments available.", bg=self.colors["bg_white"], fg=self.colors["text_body"])
+                lbl = tk.Label(self.student_view_frame, text="No student assignments available.", bg=self.colors["bg_white"], fg=self.colors["text_body"])
                 lbl.pack(pady=20)
-        elif mode == "Classroom Based":
-            self.set_columns_classroom()
-            for c_code, (d, s, rooms) in self.system.assignments.items():
-                for r in rooms:
-                    self.full_data.append((r.code, self.get_real_datetime(d, s, c_code), c_code, "OCCUPIED"))
-            self.full_data.sort()
+            
+            self.student_view_frame.grid()
+            
         elif mode == "Exam Attendance":
-            # Build attendance view: course -> list of students with their attendance status
-            # hide main tree
-            try:
-                self.tree.pack_forget()
-                self.tree_scrolly.pack_forget()
-                self.tree_scrollx.pack_forget()
-            except Exception:
-                pass
-
-            # Prepare course list for dropdown - add "All Students Overview" as first option
+            # Build exam attendance view
             self.course_list_sorted = ["📋 All Students Overview"] + sorted([c.code for c in self.system.courses])
-
-            # create course picker search in center (per-view)
-            self.attendance_search_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
-            self.attendance_search_frame.pack(fill='x', padx=6, pady=(6,4))
-            tk.Label(self.attendance_search_frame, text="Select View:", bg=self.colors["bg_white"]).pack(side='left')
+            
+            search_frame = tk.Frame(self.attendance_view_frame, bg=self.colors["bg_white"])
+            search_frame.pack(fill='x', padx=6, pady=(6,4))
+            tk.Label(search_frame, text="Select View:", bg=self.colors["bg_white"]).pack(side='left')
             
             self.course_var = tk.StringVar()
-            course_combo = ttk.Combobox(self.attendance_search_frame, textvariable=self.course_var,
+            course_combo = ttk.Combobox(search_frame, textvariable=self.course_var,
                                         values=self.course_list_sorted, state='readonly', width=30)
             course_combo.pack(side='left', padx=(6,4))
             
@@ -849,26 +872,27 @@ class ExamSchedulerApp:
                 if not selected:
                     messagebox.showwarning("Select View", "Please choose an option.")
                     return
+                # Clear previous attendance display
+                for widget in self.attendance_view_frame.winfo_children():
+                    if widget != search_frame:
+                        widget.destroy()
                 if selected == "📋 All Students Overview":
-                    self._show_all_students_attendance()
+                    self._show_all_students_attendance(self.attendance_view_frame)
                 else:
-                    self._show_exam_attendance(selected)
+                    self._show_exam_attendance(selected, self.attendance_view_frame)
             
             course_combo.bind("<<ComboboxSelected>>", _show_course_attendance)
-            show_btn = ttk.Button(self.attendance_search_frame, text="Show", command=_show_course_attendance)
+            show_btn = ttk.Button(search_frame, text="Show", command=_show_course_attendance)
             show_btn.pack(side='left', padx=(4,0))
-
-            # show All Students Overview by default
+            
             if self.course_list_sorted:
                 self.course_var.set(self.course_list_sorted[0])
-                self._show_all_students_attendance()
+                self._show_all_students_attendance(self.attendance_view_frame)
             else:
-                # show message inside a dedicated attendance_frame so it can be destroyed cleanly
-                self.attendance_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
-                self.attendance_frame.pack(fill='both', expand=True)
-                lbl = tk.Label(self.attendance_frame, text="No data available.", bg=self.colors["bg_white"], fg=self.colors["text_body"])
+                lbl = tk.Label(self.attendance_view_frame, text="No data available.", bg=self.colors["bg_white"], fg=self.colors["text_body"])
                 lbl.pack(pady=20)
-        for row in self.full_data: self.tree.insert('', 'end', values=row)
+            
+            self.attendance_view_frame.grid()
 
     def export_to_csv(self):
         view_name = self.view_var.get()
@@ -1040,11 +1064,18 @@ class ExamSchedulerApp:
         try:
             with open(path, 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f, delimiter=';')
-                try:
-                    cols = list(self.tree['columns'])
+                # Determine columns based on view type
+                if view_name == "General Schedule":
+                    cols = ["Course", "Time", "Count", "Classroom", "Capacity"]
+                elif view_name == "Classroom Based":
+                    cols = ["Classroom", "Time", "Course", "Status"]
+                else:
+                    cols = []
+                
+                if cols:
                     writer.writerow(cols)
                     writer.writerows(self.full_data)
-                except Exception:
+                else:
                     writer.writerows(self.full_data)
             messagebox.showinfo("Success", f"Data exported successfully!\nPlan: {self.view_var.get()}")
             self.append_log(f"Exported CSV: {path}")
@@ -1122,7 +1153,13 @@ class ExamSchedulerApp:
                 headers = ["Student", "Course", "Date/Time", "Classroom"]
                 table_data = [headers] + [list(r) for r in self.full_data]
             else:
-                headers = list(self.tree['columns'])
+                # General Schedule or Classroom Based
+                if self.view_var.get() == "General Schedule":
+                    headers = ["Course", "Time", "Count", "Classroom", "Capacity"]
+                elif self.view_var.get() == "Classroom Based":
+                    headers = ["Classroom", "Time", "Course", "Status"]
+                else:
+                    headers = ["Data"]
                 table_data = [headers] + [list(r) for r in self.full_data]
 
             tbl = Table(table_data, repeatRows=1)
@@ -1309,29 +1346,28 @@ class ExamSchedulerApp:
             except Exception:
                 pass
 
-    def _show_student_schedule(self, sid):
-        """Display a single student's schedule in the center area."""
-        # remove previous student widgets if present
-        try:
-            if hasattr(self, 'student_frame') and self.student_frame:
-                self.student_frame.destroy()
-        except Exception:
-            pass
-
+    def _show_student_schedule(self, sid, parent_frame):
+        """Display a single student's schedule in the parent frame."""
+        # Clear previous student schedule display (but keep search frame)
+        for widget in parent_frame.winfo_children():
+            # Keep the search frame (first child), destroy everything else
+            if widget != parent_frame.winfo_children()[0]:
+                widget.destroy()
+        
         # container for one student's schedule (no vertical scrollbar)
-        self.student_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
-        self.student_frame.pack(fill='both', expand=False, padx=6, pady=6)
+        student_frame = tk.Frame(parent_frame, bg=self.colors["bg_white"])
+        student_frame.pack(fill='both', expand=False, padx=6, pady=6)
 
         # header
-        hdr = tk.Frame(self.student_frame, bg="#cfd8dc")
-        hdr.pack(fill='x', padx=5, pady=(6,0))
+        hdr = tk.Frame(student_frame, bg="#cfd8dc")
+        hdr.pack(padx=5, pady=(6,0))
         lbl = tk.Label(hdr, text=f"Student ID: {sid}", bg="#cfd8dc", fg=self.colors["text_header"], font=('Segoe UI', 12, 'bold'))
         lbl.pack(side='left', padx=6, pady=6)
 
         # build student's table (height = number of exams so no empty space below)
         courses = self.student_groups.get(sid, [])
         cols = ["Course", "Date", "Time", "Classroom"]
-        tbl_frame = tk.Frame(self.student_frame, bg=self.colors["bg_white"])
+        tbl_frame = tk.Frame(student_frame, bg=self.colors["bg_white"])
         # don't force the frame to stretch horizontally; let the tree's column widths define table width
         tbl_frame.pack(fill='both', expand=False, padx=10, pady=8)
 
@@ -1361,27 +1397,26 @@ class ExamSchedulerApp:
         except Exception:
             pass
 
-    def _show_day_schedule(self, date_str):
-        """Display a single day's schedule in the center area."""
-        # remove previous day widgets if present
-        try:
-            if hasattr(self, 'day_frame') and self.day_frame:
-                self.day_frame.destroy()
-        except Exception:
-            pass
+    def _show_day_schedule(self, date_str, parent_frame):
+        """Display a single day's schedule in the parent frame."""
+        # Clear previous day schedule display (but keep search frame)
+        for widget in parent_frame.winfo_children():
+            # Keep the search frame (first child), destroy everything else
+            if widget != parent_frame.winfo_children()[0]:
+                widget.destroy()
+        
+        day_frame = tk.Frame(parent_frame, bg=self.colors["bg_white"])
+        day_frame.pack(fill='both', expand=False, padx=6, pady=6)
 
-        self.day_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
-        self.day_frame.pack(fill='both', expand=False, padx=6, pady=6)
-
-        hdr = tk.Frame(self.day_frame, bg="#cfd8dc")
-        hdr.pack(fill='x', padx=5, pady=(6,0))
+        hdr = tk.Frame(day_frame, bg="#cfd8dc")
+        hdr.pack(padx=5, pady=(6,0))
         lbl = tk.Label(hdr, text=f"Date: {date_str}", bg="#cfd8dc", fg=self.colors["text_header"], font=('Segoe UI', 12, 'bold'))
         lbl.pack(side='left', padx=6, pady=6)
 
         # build table for day
         rows = self.day_groups.get(date_str, [])
         cols = ["Time", "Course", "Classroom", "Students"]
-        tbl_frame = tk.Frame(self.day_frame, bg=self.colors["bg_white"])
+        tbl_frame = tk.Frame(day_frame, bg=self.colors["bg_white"])
         # do not force horizontal stretch; the tree will use the sum of its column widths
         tbl_frame.pack(fill='both', expand=False, padx=10, pady=8)
 
@@ -1405,28 +1440,21 @@ class ExamSchedulerApp:
         except Exception:
             pass
 
-    def _show_exam_attendance(self, course_code):
+    def _show_exam_attendance(self, course_code, parent_frame):
         """Display exam attendance for a specific course - shows which students are enrolled and their room assignment."""
-        # remove previous attendance widgets if present
-        try:
-            if hasattr(self, 'attendance_frame') and self.attendance_frame:
-                self.attendance_frame.destroy()
-        except Exception:
-            pass
-
-        self.attendance_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
-        self.attendance_frame.pack(fill='both', expand=True, padx=6, pady=6)
+        attendance_frame = tk.Frame(parent_frame, bg=self.colors["bg_white"])
+        attendance_frame.pack(fill='both', expand=True, padx=6, pady=6)
 
         # Find the course
         course = next((c for c in self.system.courses if c.code == course_code), None)
         if not course:
-            lbl = tk.Label(self.attendance_frame, text=f"Course '{course_code}' not found.", 
+            lbl = tk.Label(attendance_frame, text=f"Course '{course_code}' not found.", 
                           bg=self.colors["bg_white"], fg=self.colors["text_body"])
             lbl.pack(pady=20)
             return
 
         # Header with course info
-        hdr = tk.Frame(self.attendance_frame, bg="#cfd8dc")
+        hdr = tk.Frame(attendance_frame, bg="#cfd8dc")
         hdr.pack(fill='x', padx=5, pady=(6,0))
         
         # Get exam info if scheduled
@@ -1447,7 +1475,7 @@ class ExamSchedulerApp:
             room_lbl.pack(side='right', padx=6, pady=6)
 
         # Summary stats
-        stats_frame = tk.Frame(self.attendance_frame, bg=self.colors["bg_white"])
+        stats_frame = tk.Frame(attendance_frame, bg=self.colors["bg_white"])
         stats_frame.pack(fill='x', padx=10, pady=5)
         
         # Count students with room assignments
@@ -1463,7 +1491,7 @@ class ExamSchedulerApp:
         stats_lbl.pack(side='left')
 
         # Student list table with scrollbar
-        tbl_container = tk.Frame(self.attendance_frame, bg=self.colors["bg_white"])
+        tbl_container = tk.Frame(attendance_frame, bg=self.colors["bg_white"])
         tbl_container.pack(fill='both', expand=True, padx=10, pady=8)
 
         cols = ["Student ID", "Room Assignment", "Status"]
@@ -1504,22 +1532,15 @@ class ExamSchedulerApp:
         except Exception:
             pass
 
-    def _show_all_students_attendance(self):
+    def _show_all_students_attendance(self, parent_frame):
         """Display all students from 'All Students' file and show which ones are enrolled in exams."""
-        # remove previous attendance widgets if present
-        try:
-            if hasattr(self, 'attendance_frame') and self.attendance_frame:
-                self.attendance_frame.destroy()
-        except Exception:
-            pass
-
-        self.attendance_frame = tk.Frame(self.schedule_center, bg=self.colors["bg_white"])
-        self.attendance_frame.pack(fill='both', expand=True, padx=6, pady=6)
+        attendance_frame = tk.Frame(parent_frame, bg=self.colors["bg_white"])
+        attendance_frame.pack(fill='both', expand=True, padx=6, pady=6)
 
         # Check if All Students data is loaded
         all_students = self.system.all_students_list
         if not all_students:
-            lbl = tk.Label(self.attendance_frame, 
+            lbl = tk.Label(attendance_frame, 
                           text="⚠️ 'All Students' file not loaded!\n\nPlease upload 'All Students' file in the Settings tab.", 
                           bg=self.colors["bg_white"], fg=self.colors["danger"], font=('Segoe UI', 12))
             lbl.pack(pady=40)
@@ -1537,7 +1558,7 @@ class ExamSchedulerApp:
         students_in_all = all_students
         
         # Header
-        hdr = tk.Frame(self.attendance_frame, bg="#cfd8dc")
+        hdr = tk.Frame(attendance_frame, bg="#cfd8dc")
         hdr.pack(fill='x', padx=5, pady=(6,0))
         
         lbl = tk.Label(hdr, text=f"📋 All Students Overview | Total: {len(all_students)} students", 
@@ -1545,7 +1566,7 @@ class ExamSchedulerApp:
         lbl.pack(side='left', padx=6, pady=6)
 
         # Summary stats
-        stats_frame = tk.Frame(self.attendance_frame, bg=self.colors["bg_white"])
+        stats_frame = tk.Frame(attendance_frame, bg=self.colors["bg_white"])
         stats_frame.pack(fill='x', padx=10, pady=5)
         
         enrolled_in_all = enrolled_students & all_students
@@ -1557,7 +1578,7 @@ class ExamSchedulerApp:
         stats_lbl.pack(side='left')
 
         # Student list table with scrollbar
-        tbl_container = tk.Frame(self.attendance_frame, bg=self.colors["bg_white"])
+        tbl_container = tk.Frame(attendance_frame, bg=self.colors["bg_white"])
         tbl_container.pack(fill='both', expand=True, padx=10, pady=8)
 
         cols = ["Student ID", "Enrolled Courses", "Exam Count", "Status"]
