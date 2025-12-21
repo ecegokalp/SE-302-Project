@@ -1443,24 +1443,29 @@ class ExamSchedulerApp:
             "  • All Courses\n"
             "  • All Students\n"
             "- After a file is loaded successfully, its status will turn green.\n"
-            "- Database buttons (Save / Load / Compare) allow storing and comparing data states.\n\n"
+            "- Database buttons (Save / Load / Compare) allow storing and comparing data states.\n"
+            "- Compare buttons highlight differences between current files and database records.\n\n"
 
             "STEP 2 – EXAM CALENDAR SETTINGS\n"
             "- Select the exam Start Date.\n"
             "- Enter the total exam Duration (number of days).\n\n"
 
             "STEP 3 – EXAM SLOTS GENERATOR\n"
-            "- Enter daily Start and End times.\n"
-            "- Specify the minimum exam duration (minutes).\n"
+            "- Enter the start date and duration (number of days) of examination period.\n"
+            "- Specify the start and end time of the exams for each day and enter exam duration (minutes).\n"
             "- Click 'Generate' to automatically create time slots.\n"
             "- Slots can be manually removed using 'Remove Selected (-)'.\n\n"
+            
+            "STEP 4 - FIND MIN SLOTS\n"
+            "- The system can analyse your data and suggest the minimum number of slots required.\n"
+            "- Click 'FIND MIN SLOTS' to determine the minimum number of slots needed.\n\n"
 
-            "STEP 4 – GENERATE SCHEDULE\n"
+            "STEP 5 – GENERATE SCHEDULE\n"
             "- Click 'GENERATE SCHEDULE' to start automatic scheduling.\n"
             "- The system assigns exams while respecting all constraints.\n"
             "- You may stop the process at any time using the STOP button.\n\n"
-
-            "STEP 5 – VIEW RESULTS\n"
+            
+            "STEP 6 – VIEW RESULTS\n"
             "- Switch to the 'SCHEDULE (RESULT)' tab.\n"
             "- Choose different views:\n"
             "  • General Schedule\n"
@@ -1469,7 +1474,7 @@ class ExamSchedulerApp:
             "  • Classroom Based\n"
             "  • Exam Attendance\n\n"
 
-            "STEP 6 – EXPORT\n"
+            "STEP 7 – EXPORT\n"
             "- Export the generated schedule as CSV or PDF.\n"
             "- Export options change depending on the selected view.\n",
         "links": []
@@ -1477,7 +1482,7 @@ class ExamSchedulerApp:
 
     "input": {
         "title": "Input File Information",
-        "content":
+        "content": 
             "INPUT FILE FORMAT INFORMATION\n\n"
 
             "Classroom List:\n"
@@ -1492,7 +1497,11 @@ class ExamSchedulerApp:
             "All Students:\n"
             "- student_id\n\n"
 
-            "Supported file format: CSV\n",
+            "Supported file format: CSV\n\n"
+            
+            "You can access sample input files from the project's GitHub repository's README.\n\n"
+            "Please visit https://github.com/sineoyku/SE-302-Project\n\n",
+            
         "links": []
     },
 
