@@ -8,10 +8,10 @@ ExamTable Manager is a desktop application designed to automate the process of s
 
 ## Features and Usage
 * **Data import:** Users are able to import `.csv` files that include information about classrooms and capacities, Attendance lists, Courses and Students in correct formatting. You can access sample files below:
-* [Classrooms and Capacities List](docs/sampleData_AllClassroomsAndTheirCapacities.csv)
-* [Attendance Lists](docs/sampleData_AllAttendanceLists.csv)
-* [Course List](docs/sampleData_AllCourses.csv)
-* [Students List](docs/sampleData_AllStudents.csv)
+    * [Classrooms and Capacities List](docs/sampleData_AllClassroomsAndTheirCapacities.csv)
+    * [Attendance Lists](docs/sampleData_AllAttendanceLists.csv)
+    * [Course List](docs/sampleData_AllCourses.csv)
+    * [Students List](docs/sampleData_AllStudents.csv)
 
 * **Database actions:** Users are able to save their progress into a database and load from the database from specific slots. They can also compare currently loaded data with saved data to see differences between their files.
 * **Exam Period Adjustment:** Users can pick a start date for their examination period and specify how long the exam period should last. They can also customize how many slots should exist in a day and how long a slot should be, and remove slots they don’t need.
@@ -26,9 +26,10 @@ ExamTable Manager is a desktop application designed to automate the process of s
 
 ## User Interface
 * SETTINGS & DATA PANEL
-* DATA MANAGEMENT (FILES & DATABASE)
-* EXAM CALENDAR SETTINGS
-* ACTIVITY LOG
+    * DATA MANAGEMENT (FILES & DATABASE)
+    * EXAM CALENDAR SETTINGS
+    * ACTIVITY LOG
+    * BUTTONS
 * SCHEDULE (RESULT) PANEL
   * GENERAL SCHEDULE VIEW
   * DAILY PLAN VIEW
