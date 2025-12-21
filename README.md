@@ -26,13 +26,13 @@ ExamTable Manager is a desktop application designed to automate the process of s
 
 ## User Interface
 * SETTINGS & DATA PANEL
-<img width="1509" height="950" alt="settings_data" src="https://github.com/user-attachments/assets/272b2bc1-8500-426a-b6a4-69985db7a31f" />
+<img width="1509" height="950" alt="settings_dataFIXED" src="https://github.com/user-attachments/assets/d768e29b-8bb6-4ce5-a9ff-9a83690b0572" />
 
    * DATA MANAGEMENT (FILES & DATABASE)
 <img width="852" height="216" alt="data_management" src="https://github.com/user-attachments/assets/8283ec37-ee31-4d66-a8e3-5762f317bfdb" />
 
    * EXAM CALENDAR SETTINGS
-<img width="847" height="280" alt="slots" src="https://github.com/user-attachments/assets/4f4fee44-aa4c-4f47-955d-c686a76914bb" />
+<img width="847" height="280" alt="slotsFIXED" src="https://github.com/user-attachments/assets/61d49769-a41a-47d0-acbe-8879d202130a" />
 
    * ACTIVITY LOG
 <img width="591" height="511" alt="logs" src="https://github.com/user-attachments/assets/043ac9ed-9e49-4324-b841-0494a23a6b01" />
@@ -48,13 +48,13 @@ ExamTable Manager is a desktop application designed to automate the process of s
   <img width="1511" height="947" alt="daily" src="https://github.com/user-attachments/assets/de836174-a4ec-41e0-a45f-abd29825acc6" />
 
   * STUDENT BASED VIEW
-  <img width="1511" height="949" alt="student" src="https://github.com/user-attachments/assets/831b0d20-c627-46fc-8c07-39554aecd9d6" />
+  <img width="1511" height="947" alt="stuFIX" src="https://github.com/user-attachments/assets/97f0f4ce-c628-4ecc-9e9b-4c19de62c570" />
 
   * CLASSROOM BASED VIEW
   <img width="1512" height="950" alt="class" src="https://github.com/user-attachments/assets/83bc4793-0518-4d33-a78e-830b5a48a0df" />
 
   * EXAM ATTENDANCE VIEW
-  <img width="1511" height="949" alt="exam_attend" src="https://github.com/user-attachments/assets/8e1d7ef1-acb6-4e06-b953-e11f8bc74225" />
+  <img width="1512" height="950" alt="classFIX" src="https://github.com/user-attachments/assets/91d11939-2c43-4c78-9c52-ec45ca6750c2" />
 
 
 * HELP MENU
